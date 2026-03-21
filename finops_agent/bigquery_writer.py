@@ -24,13 +24,20 @@ RAW_METRICS_SCHEMA = [
     bigquery.SchemaField("uptime_total_seconds", "FLOAT"),
     bigquery.SchemaField("estimated_hourly_cost", "FLOAT"),
     bigquery.SchemaField("estimated_monthly_cost", "FLOAT"),
+    bigquery.SchemaField("seven_day_avg_cpu", "FLOAT"),
+    bigquery.SchemaField("seven_day_low_utilization_days", "INTEGER"),
+    bigquery.SchemaField("idle_but_expensive_flag", "BOOLEAN"),
     bigquery.SchemaField("timestamp", "TIMESTAMP"),
 ]
 
 RECOMMENDATIONS_SCHEMA = [
     bigquery.SchemaField("instance_name", "STRING"),
+    bigquery.SchemaField("domain", "STRING"),
     bigquery.SchemaField("category", "STRING"),
     bigquery.SchemaField("severity", "STRING"),
+    bigquery.SchemaField("action_priority", "STRING"),
+    bigquery.SchemaField("needs_human_review", "BOOLEAN"),
+    bigquery.SchemaField("recommended_owner", "STRING"),
     bigquery.SchemaField("summary", "STRING"),
     bigquery.SchemaField("rationale", "STRING"),
     bigquery.SchemaField("suggested_action", "STRING"),
@@ -59,6 +66,7 @@ def export_to_bigquery(project_id, dataset_name, raw_metrics_rows, recommendatio
             "recommendations_table": recommendations_table_id,
         }
     except (
+        RuntimeError,
         api_exceptions.GoogleAPICallError,
         auth_exceptions.GoogleAuthError,
         requests_exceptions.RequestException,
@@ -68,8 +76,15 @@ def export_to_bigquery(project_id, dataset_name, raw_metrics_rows, recommendatio
 
 
 def _ensure_table(client, table_id, schema):
-    table = bigquery.Table(table_id, schema=schema)
-    client.create_table(table, exists_ok=True)
+    table = client.create_table(bigquery.Table(table_id, schema=schema), exists_ok=True)
+    table = client.get_table(table.reference)
+    existing_fields = {field.name for field in table.schema}
+    missing_fields = [field for field in schema if field.name not in existing_fields]
+    if missing_fields:
+        table.schema = list(table.schema) + missing_fields
+        client.update_table(table, ["schema"])
+        table = client.get_table(table.reference)
+    return table
 
 
 def _prepare_raw_metrics_row(row):

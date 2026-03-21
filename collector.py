@@ -14,6 +14,7 @@ from finops_agent.metrics import get_metric_average, get_metric_latest, get_metr
 from finops_agent.pricing import estimate_hourly_cost, estimate_monthly_cost
 from finops_agent.rules import build_recommendations
 from finops_agent.schema import VMMetric
+from finops_agent.trends import apply_historical_trends, build_trend_analysis, fetch_historical_trends
 
 COLOR_ENABLED = sys.stdout.isatty()
 COLOR_RESET = "\033[0m"
@@ -47,7 +48,14 @@ def render_banner(text):
 
 
 def format_table(rows):
-    columns = ["Instance Name", "Machine Type", "Zone", "CPU %"]
+    columns = [
+        "Instance Name",
+        "Status",
+        "CPU %",
+        "Memory %",
+        "Est. Monthly Cost",
+        "Triggered Rules",
+    ]
     widths = {col: len(col) for col in columns}
     for row in rows:
         for col in columns:
@@ -70,6 +78,117 @@ def format_cpu_value(cpu):
     if cpu is None:
         return "N/A (No Data)"
     return f"{cpu}%"
+
+
+def format_percent(value):
+    if value is None:
+        return "N/A"
+    return f"{value}%"
+
+
+def format_currency(value):
+    if value is None:
+        return "N/A"
+    return f"${value}"
+
+
+def format_uptime(seconds):
+    if seconds is None:
+        return "N/A"
+    total_seconds = int(seconds)
+    days, remainder = divmod(total_seconds, 24 * 3600)
+    hours, remainder = divmod(remainder, 3600)
+    minutes, _ = divmod(remainder, 60)
+    parts = []
+    if days:
+        parts.append(f"{days}d")
+    if days or hours:
+        parts.append(f"{hours}h")
+    parts.append(f"{minutes}m")
+    return " ".join(parts)
+
+
+def format_bytes(value):
+    if value is None:
+        return "N/A"
+    units = ["B", "KB", "MB", "GB", "TB"]
+    size = float(value)
+    unit_index = 0
+    while size >= 1024 and unit_index < len(units) - 1:
+        size /= 1024
+        unit_index += 1
+    if unit_index == 0:
+        return f"{int(size)} {units[unit_index]}"
+    return f"{size:.1f} {units[unit_index]}"
+
+
+def format_network_in_out(in_bytes, out_bytes):
+    return f"{format_bytes(in_bytes)} / {format_bytes(out_bytes)}"
+
+
+def format_age_hours(hours):
+    if hours is None:
+        return "N/A"
+    return f"{hours:.1f}"
+
+
+def format_bool_flag(value):
+    return "yes" if value else "no"
+
+
+def build_display_rows(metrics, recommendations):
+    recommendation_counts = {}
+    for recommendation in recommendations:
+        recommendation_counts[recommendation.instance_name] = (
+            recommendation_counts.get(recommendation.instance_name, 0) + 1
+        )
+
+    rows = []
+    for metric in metrics:
+        rows.append(
+            {
+                "Instance Name": metric.instance_name,
+                "Status": metric.status,
+                "CPU %": format_cpu_value(metric.cpu_utilization_avg),
+                "Memory %": format_percent(metric.memory_utilization_avg),
+                "Est. Monthly Cost": format_currency(metric.estimated_monthly_cost),
+                "Triggered Rules": recommendation_counts.get(metric.instance_name, 0),
+            }
+        )
+    return rows
+
+
+def build_trend_summary(metrics):
+    trend_rows = []
+    for metric in metrics:
+        if metric.seven_day_avg_cpu is None and metric.seven_day_low_utilization_days is None:
+            continue
+        trend_rows.append(
+            {
+                "instance_name": metric.instance_name,
+                "seven_day_avg_cpu": metric.seven_day_avg_cpu,
+                "seven_day_low_utilization_days": metric.seven_day_low_utilization_days or 0,
+                "idle_but_expensive_flag": metric.idle_but_expensive_flag,
+            }
+        )
+    return trend_rows
+
+
+def render_trend_summary(trend_rows):
+    if not trend_rows:
+        return ""
+
+    lines = [stylize("Trend Summary", COLOR_BOLD)]
+    for row in trend_rows:
+        avg_cpu = "N/A" if row["seven_day_avg_cpu"] is None else f"{row['seven_day_avg_cpu']}%"
+        lines.append(
+            "- "
+            f"{row['instance_name']}: "
+            f"7d avg CPU {avg_cpu} - "
+            f"7d low-util days {row['seven_day_low_utilization_days']} - "
+            f"idle-but-expensive {format_bool_flag(row['idle_but_expensive_flag'])}"
+        )
+    return "\n".join(lines)
 
 
 def load_env_from_file(filename=".env"):
@@ -191,19 +310,8 @@ if __name__ == "__main__":
     vms = get_instances(PROJECT_ID)
     print(render_banner(f"GCP VM Metrics · {PROJECT_ID}"))
     collected_metrics = []
-    display_rows = []
-
     for vm in vms:
         cpu = get_cpu_utilization(PROJECT_ID, vm["id"])
-        display_rows.append(
-            {
-                "Instance Name": vm["name"],
-                "Machine Type": vm["machine_type"],
-                "Zone": vm["zone"],
-                "CPU %": format_cpu_value(cpu),
-            }
-        )
-
         collected_metrics.append(
             VMMetric(
                 instance_name=vm["name"],
@@ -253,23 +361,35 @@ if __name__ == "__main__":
             )
         )
 
+    generated_recommendations = build_recommendations(collected_metrics)
+    bq_dataset = os.getenv("BIGQUERY_DATASET")
+    if bq_dataset:
+        historical_trends = fetch_historical_trends(PROJECT_ID, bq_dataset)
+        collected_metrics = apply_historical_trends(collected_metrics, historical_trends)
+    display_rows = build_display_rows(collected_metrics, generated_recommendations)
+
     if display_rows:
         print(format_table(display_rows))
+        trend_summary = render_trend_summary(build_trend_summary(collected_metrics))
+        if trend_summary:
+            print()
+            print(trend_summary)
     else:
         print(stylize("No Compute Engine instances found or accessible.", COLOR_WARN))
 
     raw_metrics_payload = [metric.to_dict() for metric in collected_metrics]
     run_timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
     recommendations_payload = []
-    for recommendation in build_recommendations(collected_metrics):
+    for recommendation in generated_recommendations:
         recommendation_row = recommendation.to_dict()
         recommendation_row["run_timestamp"] = run_timestamp
         recommendations_payload.append(recommendation_row)
     metrics_path = write_json_file("metrics.json", raw_metrics_payload)
     raw_metrics_path = write_json_file("raw_metrics.json", raw_metrics_payload)
     recommendations_path = write_json_file("recommendations.json", recommendations_payload)
+    trend_analysis_payload = build_trend_analysis(collected_metrics)
+    trend_analysis_path = write_json_file("trend_analysis.json", trend_analysis_payload)
 
-    bq_dataset = os.getenv("BIGQUERY_DATASET")
     bq_export = None
     if bq_dataset:
         bq_export = export_to_bigquery(
@@ -282,7 +402,8 @@ if __name__ == "__main__":
     summary = (
         f"Records saved: {len(raw_metrics_payload)} -> {os.path.basename(metrics_path)}, "
         f"{os.path.basename(raw_metrics_path)} | "
-        f"Recommendations: {len(recommendations_payload)} -> {os.path.basename(recommendations_path)}"
+        f"Recommendations: {len(recommendations_payload)} -> {os.path.basename(recommendations_path)} | "
+        f"Trend analysis -> {os.path.basename(trend_analysis_path)}"
     )
     if bq_export:
         summary += f" | BigQuery: {bq_export['dataset']}"

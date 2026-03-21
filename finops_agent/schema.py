@@ -20,6 +20,9 @@ class VMMetric:
     uptime_total_seconds: float | None = None
     estimated_hourly_cost: float | None = None
     estimated_monthly_cost: float | None = None
+    seven_day_avg_cpu: float | None = None
+    seven_day_low_utilization_days: int | None = None
+    idle_but_expensive_flag: bool = False
     timestamp: str = ""
 
     def to_dict(self) -> dict:
@@ -29,8 +32,12 @@ class VMMetric:
 @dataclass
 class Recommendation:
     instance_name: str
+    domain: str
     category: str
     severity: str
+    action_priority: str
+    needs_human_review: bool
+    recommended_owner: str
     summary: str
     rationale: str
     suggested_action: str

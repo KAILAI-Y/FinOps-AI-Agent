@@ -12,6 +12,7 @@ RECOMMENDATIONS_PATH = OUTPUTS_DIR / "recommendations.json"
 REPORT_JSON_PATH = OUTPUTS_DIR / "finops_report.json"
 REPORT_MD_PATH = OUTPUTS_DIR / "finops_report.md"
 GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
+TREND_CATEGORIES = {"persistent-low-utilization", "idle-but-expensive"}
 
 
 def load_env_from_file(filename=".env"):
@@ -47,15 +48,73 @@ def build_report_context(metrics, recommendations):
     for recommendation in recommendations:
         category = recommendation["category"]
         recommendation_counts[category] = recommendation_counts.get(category, 0) + 1
+    trend_summary = build_trend_summary(metrics)
+    finding_breakdown = build_finding_breakdown(recommendations)
+    domain_counts = build_domain_counts(recommendations)
 
     return {
         "total_instances": total_instances,
         "running_instances": running_instances,
         "total_estimated_monthly_cost": total_estimated_monthly_cost,
         "recommendation_counts": recommendation_counts,
+        "domain_counts": domain_counts,
+        "trend_summary": trend_summary,
+        "finding_breakdown": finding_breakdown,
         "metrics": metrics,
         "recommendations": recommendations,
     }
+
+
+def build_trend_summary(metrics):
+    trend_ready_instances = sum(
+        1 for metric in metrics if metric.get("seven_day_avg_cpu") is not None
+    )
+    idle_but_expensive_instances = [
+        metric["instance_name"]
+        for metric in metrics
+        if metric.get("idle_but_expensive_flag")
+    ]
+    persistent_low_utilization_instances = [
+        metric["instance_name"]
+        for metric in metrics
+        if (metric.get("seven_day_low_utilization_days") or 0) >= 3
+    ]
+    return {
+        "trend_ready_instances": trend_ready_instances,
+        "idle_but_expensive_instances": idle_but_expensive_instances,
+        "persistent_low_utilization_instances": persistent_low_utilization_instances,
+    }
+
+
+def build_finding_breakdown(recommendations):
+    snapshot_findings = []
+    trend_findings = []
+    for recommendation in recommendations:
+        target = trend_findings if recommendation.get("category") in TREND_CATEGORIES else snapshot_findings
+        target.append(
+            {
+                "instance_name": recommendation.get("instance_name", "unknown"),
+                "domain": recommendation.get("domain", "unknown"),
+                "category": recommendation.get("category", "unknown"),
+                "severity": recommendation.get("severity", "unknown"),
+                "action_priority": recommendation.get("action_priority", "unknown"),
+                "needs_human_review": recommendation.get("needs_human_review", True),
+                "recommended_owner": recommendation.get("recommended_owner", "unknown"),
+                "summary": recommendation.get("summary", ""),
+            }
+        )
+    return {
+        "snapshot_findings": snapshot_findings,
+        "trend_findings": trend_findings,
+    }
+
+
+def build_domain_counts(recommendations):
+    domain_counts = {}
+    for recommendation in recommendations:
+        domain = recommendation.get("domain", "unknown")
+        domain_counts[domain] = domain_counts.get(domain, 0) + 1
+    return domain_counts
 
 
 def build_fallback_summary(context):
@@ -64,6 +123,11 @@ def build_fallback_summary(context):
     running_instances = context["running_instances"]
     total_instances = context["total_instances"]
     total_cost = context["total_estimated_monthly_cost"]
+    trend_summary = context.get("trend_summary", {})
+    finding_breakdown = context.get("finding_breakdown", {})
+    domain_counts = context.get("domain_counts", {})
+    snapshot_findings = finding_breakdown.get("snapshot_findings", [])
+    trend_findings = finding_breakdown.get("trend_findings", [])
 
     severity_rank = {"high": 0, "medium": 1, "low": 2}
     prioritized_recommendations = sorted(
@@ -86,6 +150,22 @@ def build_fallback_summary(context):
         current_state,
         f"Estimated monthly run cost across sampled VMs: ${total_cost}.",
     ]
+    if trend_summary.get("trend_ready_instances"):
+        lines.append(
+            f"Historical trend coverage is available for {trend_summary['trend_ready_instances']} VM(s) over the last 7 days."
+        )
+    if trend_summary.get("persistent_low_utilization_instances"):
+        lines.append(
+            "Persistent low-utilization candidates: "
+            + ", ".join(trend_summary["persistent_low_utilization_instances"][:3])
+            + "."
+        )
+    lines.append(
+        f"Snapshot findings: {len(snapshot_findings)}. Trend findings: {len(trend_findings)}."
+    )
+    if domain_counts:
+        domain_parts = [f"{domain} {count}" for domain, count in sorted(domain_counts.items())]
+        lines.append("Domain breakdown: " + ", ".join(domain_parts) + ".")
 
     headline = "No material optimization findings in current sample."
     if prioritized_recommendations:
@@ -119,6 +199,10 @@ def build_fallback_summary(context):
         risks.append("Stopped instances can still incur cost through attached disks, reserved IPs, or other leftover resources.")
     if "governance" in categories:
         risks.append("Missing ownership labels make chargeback and remediation routing slower.")
+    if trend_summary.get("idle_but_expensive_instances"):
+        risks.append(
+            "Some VMs appear both persistently underutilized and relatively expensive, which makes them stronger optimization candidates."
+        )
     if not risks and prioritized_recommendations:
         risks.append("Optimization findings should be validated against workload criticality before action is taken.")
 
@@ -147,6 +231,8 @@ def build_fallback_summary(context):
         "actions": actions,
         "risks": risks,
         "mode": "deterministic",
+        "snapshot_findings": snapshot_findings,
+        "trend_findings": trend_findings,
     }
 
 
@@ -254,6 +340,8 @@ def build_markdown_report(report):
     how_to_check = report.get("how_to_check") or []
     actions = report.get("actions") or []
     risks = report.get("risks") or []
+    snapshot_findings = report.get("snapshot_findings") or []
+    trend_findings = report.get("trend_findings") or []
 
     lines = [
         "# FinOps Report",
@@ -294,6 +382,34 @@ def build_markdown_report(report):
     else:
         lines.append("- No actions suggested.")
 
+    lines.extend(
+        [
+            "",
+            "## Snapshot Findings",
+        ]
+    )
+    if snapshot_findings:
+        lines.extend(
+            f"- [{finding['severity']}] [{finding['domain']}] [{finding['action_priority']}] {finding['instance_name']} / {finding['category']}: {finding['summary']} | owner: {finding['recommended_owner']} | human-review: {finding['needs_human_review']}"
+            for finding in snapshot_findings
+        )
+    else:
+        lines.append("- No snapshot findings identified.")
+
+    lines.extend(
+        [
+            "",
+            "## Trend Findings",
+        ]
+    )
+    if trend_findings:
+        lines.extend(
+            f"- [{finding['severity']}] [{finding['domain']}] [{finding['action_priority']}] {finding['instance_name']} / {finding['category']}: {finding['summary']} | owner: {finding['recommended_owner']} | human-review: {finding['needs_human_review']}"
+            for finding in trend_findings
+        )
+    else:
+        lines.append("- No trend findings identified.")
+
     lines.append("")
     lines.append("## Risks")
     if risks:
@@ -329,6 +445,9 @@ def main():
 
     if report is None:
         report = build_fallback_summary(context)
+    else:
+        report["snapshot_findings"] = context["finding_breakdown"]["snapshot_findings"]
+        report["trend_findings"] = context["finding_breakdown"]["trend_findings"]
 
     write_outputs(report)
     print(f"Report written: {REPORT_JSON_PATH.name}, {REPORT_MD_PATH.name} [{report['mode']}]")
