@@ -138,21 +138,70 @@ pip install -r requirements.txt
 
 ## Configuration
 
-Create a `.env` file in the project root:
+Create a `.env` file in the project root.
+
+### Minimum required `.env`
+
+These values are required for GCP collection:
 
 ```ini
 GCP_PROJECT_ID=your-project-id
 GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/gcp-key.json
+```
+
+### Optional `.env`
+
+These values enable BigQuery export and Gemini generation:
+
+```ini
 BIGQUERY_DATASET=finops_agent
 GEMINI_API_KEY=your-api-key
 GEMINI_MODEL=gemini-2.5-flash
 ```
 
+### Optional SMTP `.env`
+
+These values enable actual email delivery from `emailer.py`:
+
+```ini
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your_gmail@gmail.com
+SMTP_PASSWORD=your_app_password
+SMTP_USE_TLS=true
+EMAIL_FROM=your_gmail@gmail.com
+EMAIL_TO=recipient@example.com
+```
+
 Notes:
 
+- `.env` is expected by `collector.py`, `summarizer.py`, and `emailer.py`
 - `GOOGLE_APPLICATION_CREDENTIALS` can be omitted if `gcp-key.json` is placed in the repository root
 - `BIGQUERY_DATASET` is optional
 - `GEMINI_API_KEY` is optional; without it, report generation uses deterministic fallback
+- if SMTP variables are missing, `emailer.py` still writes preview files but does not send mail
+- for Gmail SMTP, use an App Password instead of your normal account password
+
+## Quick Start
+
+For a first successful run:
+
+1. create a `.env` file with at least `GCP_PROJECT_ID` and `GOOGLE_APPLICATION_CREDENTIALS`
+2. run the collector to generate telemetry and recommendations
+3. generate the report, quality summary, and optional email preview
+
+```bash
+./venv/bin/python collector.py
+./venv/bin/python summarizer.py
+./venv/bin/python quality_check.py
+./venv/bin/python emailer.py
+```
+
+If SMTP is not configured, the last step still generates:
+
+- `outputs/email_preview.json`
+- `outputs/email_preview.txt`
+- `outputs/email_preview.html`
 
 ## Usage
 
