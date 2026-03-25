@@ -16,6 +16,8 @@ Each run can:
 - collect CPU, memory, disk, network, uptime, lifecycle, and estimated cost signals
 - generate deterministic recommendations from snapshot and trend signals
 - enrich current records with 7-day history from BigQuery
+- provision and re-provision the project VM with Terraform
+- translate selected findings into Terraform machine-type change proposals
 - write local JSON and Markdown artifacts
 - append telemetry and recommendations to BigQuery
 - generate a report with Gemini or deterministic fallback
@@ -80,6 +82,17 @@ Each recommendation now includes decision-oriented fields:
 - `recommended_owner`
   - suggested owner derived from labels and rule domain
 
+Priority meaning used in findings and emails:
+
+- `p1`
+  - highest priority; immediate review recommended
+- `p2`
+  - elevated priority; important SRE-style review item
+- `p3`
+  - normal follow-up priority; optimization or governance work item
+- `p4`
+  - low priority; informational or non-urgent follow-up
+
 ## Architecture
 
 1. `collector.py` loads configuration and queries GCP APIs plus Cloud Monitoring.
@@ -89,6 +102,7 @@ Each recommendation now includes decision-oriented fields:
 5. If `BIGQUERY_DATASET` is configured, rows are appended to BigQuery tables.
 6. `summarizer.py` generates JSON and Markdown reports.
 7. `quality_check.py` validates run completeness and basic trustworthiness.
+8. `terraform_actions.py` turns eligible findings into Terraform patch proposals.
 
 ## Project Structure
 
@@ -98,12 +112,20 @@ FinOps-AI-Agent/
 ├── summarizer.py
 ├── emailer.py
 ├── quality_check.py
+├── terraform_actions.py
 ├── requirements.txt
+├── terraform/
+│   ├── main.tf
+│   ├── outputs.tf
+│   ├── terraform.tfvars.example
+│   ├── variables.tf
+│   └── versions.tf
 ├── tests/
 │   ├── test_emailer.py
 │   ├── test_quality_check.py
 │   ├── test_rules.py
 │   ├── test_summarizer.py
+│   ├── test_terraform_actions.py
 │   └── test_trends.py
 ├── finops_agent/
 │   ├── __init__.py
@@ -112,6 +134,7 @@ FinOps-AI-Agent/
 │   ├── pricing.py
 │   ├── rules.py
 │   ├── schema.py
+│   ├── terraform_actions.py
 │   └── trends.py
 └── outputs/
 ```
@@ -119,6 +142,7 @@ FinOps-AI-Agent/
 ## Requirements
 
 - Python 3.11+
+- Terraform 1.5+
 - a GCP project
 - IAM access for:
   - `roles/compute.viewer`
@@ -135,6 +159,8 @@ python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 ```
+
+If you want to provision the demo environment with Terraform, also install Terraform locally.
 
 ## Configuration
 
@@ -181,6 +207,7 @@ Notes:
 - `GEMINI_API_KEY` is optional; without it, report generation uses deterministic fallback
 - if SMTP variables are missing, `emailer.py` still writes preview files but does not send mail
 - for Gmail SMTP, use an App Password instead of your normal account password
+- Terraform does not read `.env` automatically; set `credentials_file` in `terraform.tfvars` or use Application Default Credentials
 
 ## Quick Start
 
@@ -195,6 +222,7 @@ For a first successful run:
 ./venv/bin/python summarizer.py
 ./venv/bin/python quality_check.py
 ./venv/bin/python emailer.py
+./venv/bin/python terraform_actions.py
 ```
 
 If SMTP is not configured, the last step still generates:
@@ -212,6 +240,7 @@ Run the full pipeline in this order:
 ./venv/bin/python summarizer.py
 ./venv/bin/python quality_check.py
 ./venv/bin/python emailer.py
+./venv/bin/python terraform_actions.py
 ```
 
 ### `collector.py`
@@ -264,6 +293,84 @@ This step checks for:
 - writes local preview files
 - sends the email through SMTP when SMTP configuration is present
 
+### `terraform_actions.py`
+
+- loads `metrics.json`, `recommendations.json`, and `terraform/terraform.tfvars`
+- identifies right-sizing findings that can translate into Terraform changes
+- skips proposals when conflicting SRE findings make downsizing unsafe
+- generates a proposal payload instead of editing Terraform automatically
+- writes `outputs/terraform_actions.json`
+
+## Terraform
+
+The `terraform/` directory provisions a minimal demo environment for this project:
+
+- a single project VM in Compute Engine
+- a Debian-based boot disk for that VM
+- labels that align the VM with FinOps and Terraform governance checks
+
+It is intended for project and demo infrastructure. Existing production-style VMs are better handled by the analytics pipeline plus Terraform action proposals, rather than direct Terraform takeover.
+
+### Terraform setup
+
+```bash
+cd terraform
+cp terraform.tfvars.example terraform.tfvars
+terraform init
+terraform plan
+terraform apply
+```
+
+### Terraform variables
+
+At minimum, set this in `terraform.tfvars`:
+
+```hcl
+project_id = "your-project-id"
+credentials_file = "/absolute/path/to/gcp-key.json"
+```
+
+You can also override:
+
+- `region`
+- `zone`
+- `instance_name`
+- `machine_type`
+- `owner_label`
+- `team_label`
+- `environment_label`
+- `cost_center_label`
+- `existing_network_name`
+- `existing_subnetwork_name`
+
+If you prefer ADC instead of a key file, leave `credentials_file` empty and run:
+
+```bash
+gcloud auth application-default login
+```
+
+### Terraform outputs
+
+After `terraform apply`, Terraform returns:
+
+- demo VM name
+- demo VM external IP
+
+### Terraform action proposals
+
+After `collector.py` generates recommendations, you can create Terraform change proposals with:
+
+```bash
+./venv/bin/python terraform_actions.py
+```
+
+The current implementation focuses on right-sizing proposals:
+
+- it looks for categories such as `rightsizing`, `persistent-low-utilization`, `idle-but-expensive`, and `idle-instance`
+- it blocks machine-type changes when SRE findings such as `memory-bound`, `missing-observability`, or `high-cpu-sustained` are present
+- it proposes a `machine_type` update in `terraform.tfvars` instead of applying changes directly
+- it also writes a patch-style preview for review before any Terraform apply step
+
 ## Outputs
 
 Each run produces these local artifacts:
@@ -290,6 +397,10 @@ Each run produces these local artifacts:
   Plain text email preview
 - `outputs/email_preview.html`
   HTML email preview
+- `outputs/terraform_actions.json`
+  Terraform action proposal payload for right-sizing candidates managed by Terraform
+- `outputs/terraform_actions.patch`
+  Patch-style preview of the suggested `terraform.tfvars` machine type change
 
 `collector.py` also prints a terminal snapshot table with:
 
@@ -334,6 +445,7 @@ The repository includes offline unit tests for:
 - quality checks
 - report fallback logic
 - historical trend field application
+- Terraform action proposal generation
 
 Run all tests with:
 
@@ -343,7 +455,7 @@ Run all tests with:
 
 Current expected result:
 
-- `Ran 15 tests`
+- `Ran 18 tests`
 - `OK`
 
 ## Example Questions This Project Can Answer

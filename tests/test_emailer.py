@@ -47,11 +47,16 @@ class EmailerTestCase(unittest.TestCase):
         payload = build_fallback_email(context)
 
         self.assertIn("idle-vm", payload["subject"])
-        self.assertIn("Snapshot findings: 0", payload["plain_text"])
-        self.assertIn("Trend findings: 0", payload["plain_text"])
-        self.assertIn("Top findings:", payload["plain_text"])
+        self.assertIn("Executive Summary", payload["plain_text"])
+        self.assertIn("Action Items", payload["plain_text"])
+        self.assertIn("Findings by Domain", payload["plain_text"])
+        self.assertIn("Recommended Next Action", payload["plain_text"])
+        self.assertIn("Owner Hints", payload["plain_text"])
+        self.assertIn("Quality and Trend Summary", payload["plain_text"])
+        self.assertIn("Highest priority observed: P1.", payload["plain_text"])
         self.assertIn("finops-team", payload["plain_text"])
-        self.assertIn("<html>", payload["html"])
+        self.assertIn("<h2>Action Items</h2>", payload["html"])
+        self.assertIn("<h2>Findings by Domain</h2>", payload["html"])
         self.assertEqual(payload["mode"], "deterministic")
 
 

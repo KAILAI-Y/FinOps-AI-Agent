@@ -95,6 +95,18 @@ def build_email_context(report, quality_report, trend_analysis, recommendations)
     for finding in all_findings:
         priority = finding.get("action_priority", "unknown")
         priority_counts[priority] = priority_counts.get(priority, 0) + 1
+    findings_by_domain = {"sre": [], "finops": [], "governance": []}
+    for finding in all_findings:
+        findings_by_domain.setdefault(finding["domain"], []).append(finding)
+    action_items = top_findings[:3]
+    highest_priority = next(
+        (
+            priority
+            for priority in ("p1", "p2", "p3", "p4")
+            if priority_counts.get(priority, 0) > 0
+        ),
+        "none",
+    )
     return {
         "headline": report.get("headline", "Infrastructure Review Summary"),
         "primary_candidate": report.get("primary_candidate", "None"),
@@ -104,6 +116,9 @@ def build_email_context(report, quality_report, trend_analysis, recommendations)
         "top_findings": top_findings,
         "domain_counts": domain_counts,
         "priority_counts": priority_counts,
+        "findings_by_domain": findings_by_domain,
+        "action_items": action_items,
+        "highest_priority": highest_priority,
         "quality_summary": quality_report.get("summary", {}),
         "trend_summary": summary,
     }
@@ -116,66 +131,83 @@ def build_fallback_email(context):
     trend_summary = context["trend_summary"]
     domain_counts = context.get("domain_counts", {})
     priority_counts = context.get("priority_counts", {})
-    subject = (
-        f"FinOps AI Agent Report: {context['headline']}"
-        if context["headline"]
-        else "FinOps AI Agent Report"
-    )
-
+    subject = build_fallback_subject(context)
     lines = [
-        "FinOps AI Agent Daily Summary",
+        "Cloud Operations Notification",
         "",
+        "Executive Summary",
+        (
+            f"This run produced {snapshot_count} snapshot finding(s) and {trend_count} trend finding(s). "
+            f"Highest priority observed: {context.get('highest_priority', 'none').upper()}."
+        ),
         f"Headline: {context['headline']}",
         f"Primary candidate: {context['primary_candidate']}",
-        f"Recommended action: {context['recommended_action']}",
         "",
-        f"Snapshot findings: {snapshot_count}",
-        f"Trend findings: {trend_count}",
-        (
-            "Trend-ready instances: "
-            f"{trend_summary.get('trend_ready_instances', 0)}"
-        ),
-        (
-            "Persistent low-utilization instances: "
-            f"{trend_summary.get('persistent_low_utilization_instances', 0)}"
-        ),
-        (
-            "Idle-but-expensive instances: "
-            f"{trend_summary.get('idle_but_expensive_instances', 0)}"
-        ),
-        "",
-        "Domain breakdown:",
-        f"- finops: {domain_counts.get('finops', 0)}",
-        f"- sre: {domain_counts.get('sre', 0)}",
-        f"- governance: {domain_counts.get('governance', 0)}",
-        "",
-        "Priority breakdown:",
-        f"- p1: {priority_counts.get('p1', 0)}",
-        f"- p2: {priority_counts.get('p2', 0)}",
-        f"- p3: {priority_counts.get('p3', 0)}",
-        f"- p4: {priority_counts.get('p4', 0)}",
-        "",
-        "Quality summary:",
-        f"- pass: {quality_summary.get('pass', 0)}",
-        f"- warn: {quality_summary.get('warn', 0)}",
-        f"- fail: {quality_summary.get('fail', 0)}",
-        f"- info: {quality_summary.get('info', 0)}",
+        "Action Items",
     ]
 
-    top_findings = context.get("top_findings", [])
-    if top_findings:
-        lines.append("")
-        lines.append("Top findings:")
-        for finding in top_findings:
+    action_items = context.get("action_items", [])
+    if action_items:
+        for finding in action_items:
             lines.append(
-                f"- [{finding.get('action_priority', 'unknown')}] "
-                f"[{finding.get('domain', 'unknown')}] "
-                f"{finding.get('instance_name', 'unknown')} / {finding.get('category', 'unknown')} "
+                f"- [{finding.get('action_priority', 'unknown').upper()}] "
+                f"{finding.get('instance_name', 'unknown')} / {finding.get('category', 'unknown')}: "
+                f"{finding.get('summary', '')} "
                 f"(owner: {finding.get('recommended_owner', 'unknown')}, human-review: {finding.get('needs_human_review', True)})"
             )
+    else:
+        lines.append("- No immediate action items were identified in this run.")
+
+    lines.extend(
+        [
+            "",
+            "Findings by Domain",
+        ]
+    )
+    findings_by_domain = context.get("findings_by_domain", {})
+    for domain in ("sre", "finops", "governance"):
+        lines.append(f"- {domain}: {domain_counts.get(domain, 0)}")
+        domain_findings = findings_by_domain.get(domain, [])[:3]
+        if domain_findings:
+            for finding in domain_findings:
+                lines.append(
+                    f"  {finding.get('instance_name', 'unknown')} / {finding.get('category', 'unknown')} "
+                    f"[{finding.get('action_priority', 'unknown')}]"
+                )
+        else:
+            lines.append("  none")
+
+    lines.extend(
+        [
+            "",
+            "Recommended Next Action",
+            context["recommended_action"],
+            "",
+            "Owner Hints",
+        ]
+    )
+    owner_hints = {item.get("recommended_owner", "unknown") for item in action_items if item.get("recommended_owner")}
+    if owner_hints:
+        for owner in sorted(owner_hints):
+            lines.append(f"- {owner}")
+    else:
+        lines.append("- No owner-specific routing was generated in this run.")
+
+    lines.extend(
+        [
+            "",
+            "Quality and Trend Summary",
+            f"- Quality checks: pass={quality_summary.get('pass', 0)}, warn={quality_summary.get('warn', 0)}, fail={quality_summary.get('fail', 0)}, info={quality_summary.get('info', 0)}",
+            f"- Trend-ready instances: {trend_summary.get('trend_ready_instances', 0)}",
+            f"- Persistent low-utilization instances: {trend_summary.get('persistent_low_utilization_instances', 0)}",
+            f"- Idle-but-expensive instances: {trend_summary.get('idle_but_expensive_instances', 0)}",
+            f"- Domain counts: sre={domain_counts.get('sre', 0)}, finops={domain_counts.get('finops', 0)}, governance={domain_counts.get('governance', 0)}",
+            f"- Priority counts: p1={priority_counts.get('p1', 0)}, p2={priority_counts.get('p2', 0)}, p3={priority_counts.get('p3', 0)}, p4={priority_counts.get('p4', 0)}",
+        ]
+    )
 
     plain_text = "\n".join(lines) + "\n"
-    html = build_html_email(subject, lines, top_findings)
+    html = build_html_email(subject, context)
     return {
         "subject": subject,
         "plain_text": plain_text,
@@ -184,28 +216,84 @@ def build_fallback_email(context):
     }
 
 
-def build_html_email(subject, lines, top_findings):
-    escaped_lines = "".join(f"<p>{line}</p>" if line else "<br>" for line in lines)
-    top_findings_html = ""
-    if top_findings:
-        items = "".join(
-            "<li>"
-            f"[{finding.get('action_priority', 'unknown')}] "
-            f"[{finding.get('domain', 'unknown')}] "
-            f"{finding.get('instance_name', 'unknown')} / {finding.get('category', 'unknown')} "
-            f"(owner: {finding.get('recommended_owner', 'unknown')})"
-            "</li>"
-            for finding in top_findings
-        )
-        top_findings_html = f"<h2>Top Findings</h2><ul>{items}</ul>"
+def build_fallback_subject(context):
+    highest_priority = context.get("highest_priority", "none").upper()
+    if highest_priority in {"P1", "P2"}:
+        return f"Action Required: {context['headline']}"
+    return f"Daily Cloud Ops Summary: {context['headline']}"
 
-    return (
-        "<html><body>"
-        f"<h1>{subject}</h1>"
-        f"{escaped_lines}"
-        f"{top_findings_html}"
-        "</body></html>"
+
+def build_html_email(subject, context):
+    action_items = context.get("action_items", [])
+    findings_by_domain = context.get("findings_by_domain", {})
+    quality_summary = context.get("quality_summary", {})
+    trend_summary = context.get("trend_summary", {})
+    domain_counts = context.get("domain_counts", {})
+
+    action_items_html = "".join(
+        "<li>"
+        f"<strong>[{finding.get('action_priority', 'unknown').upper()}]</strong> "
+        f"{finding.get('instance_name', 'unknown')} / {finding.get('category', 'unknown')}: "
+        f"{finding.get('summary', '')} "
+        f"<br><small>owner: {finding.get('recommended_owner', 'unknown')} | human-review: {finding.get('needs_human_review', True)}</small>"
+        "</li>"
+        for finding in action_items
+    ) or "<li>No immediate action items were identified in this run.</li>"
+
+    domain_sections = []
+    for domain in ("sre", "finops", "governance"):
+        items = findings_by_domain.get(domain, [])[:3]
+        item_html = "".join(
+            "<li>"
+            f"{finding.get('instance_name', 'unknown')} / {finding.get('category', 'unknown')} "
+            f"<small>[{finding.get('action_priority', 'unknown')}]</small>"
+            "</li>"
+            for finding in items
+        ) or "<li>none</li>"
+        domain_sections.append(
+            f"<h3>{domain.upper()} ({domain_counts.get(domain, 0)})</h3><ul>{item_html}</ul>"
+        )
+
+    owner_hints = sorted(
+        {item.get("recommended_owner", "unknown") for item in action_items if item.get("recommended_owner")}
     )
+    owner_html = "".join(f"<li>{owner}</li>" for owner in owner_hints) or "<li>No owner-specific routing was generated in this run.</li>"
+
+    return f"""
+<html>
+  <body style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.5;">
+    <h1>{subject}</h1>
+    <h2>Executive Summary</h2>
+    <p>
+      This run produced {len(context.get('snapshot_findings', []))} snapshot finding(s) and
+      {len(context.get('trend_findings', []))} trend finding(s).
+      Highest priority observed: {context.get('highest_priority', 'none').upper()}.
+    </p>
+    <p><strong>Headline:</strong> {context.get('headline', '')}</p>
+    <p><strong>Primary candidate:</strong> {context.get('primary_candidate', '')}</p>
+
+    <h2>Action Items</h2>
+    <ul>{action_items_html}</ul>
+
+    <h2>Findings by Domain</h2>
+    {''.join(domain_sections)}
+
+    <h2>Recommended Next Action</h2>
+    <p>{context.get('recommended_action', '')}</p>
+
+    <h2>Owner Hints</h2>
+    <ul>{owner_html}</ul>
+
+    <h2>Quality and Trend Summary</h2>
+    <ul>
+      <li>Quality checks: pass={quality_summary.get('pass', 0)}, warn={quality_summary.get('warn', 0)}, fail={quality_summary.get('fail', 0)}, info={quality_summary.get('info', 0)}</li>
+      <li>Trend-ready instances: {trend_summary.get('trend_ready_instances', 0)}</li>
+      <li>Persistent low-utilization instances: {trend_summary.get('persistent_low_utilization_instances', 0)}</li>
+      <li>Idle-but-expensive instances: {trend_summary.get('idle_but_expensive_instances', 0)}</li>
+    </ul>
+  </body>
+</html>
+""".strip()
 
 
 def build_gemini_email_prompt(context):
@@ -219,20 +307,23 @@ Return JSON with exactly these keys:
 
 Requirements:
 - subject should be concise, specific, and action-oriented
-- plain_text should read like a real operations email, not a raw dump
-- html should be simple, valid, and readable
+- plain_text should read like a real operations email with stable section headers
+- html should follow the same section structure as the plain text version
 - include these sections in the email body:
   1. Executive Summary
-  2. Top Findings
-  3. Recommended Next Action
-  4. Owner Hints
-  5. Quality and Trend Summary
+  2. Action Items
+  3. Findings by Domain
+  4. Recommended Next Action
+  5. Owner Hints
+  6. Quality and Trend Summary
 - prioritize p1 and p2 findings first
 - mention domain names such as sre, finops, governance when relevant
 - include owner hints when available
 - keep the tone direct and operational, not marketing-style
 - do not invent facts not present in the input
 - if there are no findings in a section, say so briefly instead of padding
+- for Findings by Domain, group items under sre, finops, and governance
+- do not output markdown fences or explanations outside the JSON object
 
 The email is for an operator or reviewer who needs to understand what happened in this run and what to do next.
 

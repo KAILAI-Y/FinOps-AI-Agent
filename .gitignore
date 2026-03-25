@@ -7,3 +7,10 @@ plan.md
 __pycache__/
 outputs/
 .DS_Store
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+terraform.tfvars
+terraform/tfplan.binary
+terraform/.infracost/
