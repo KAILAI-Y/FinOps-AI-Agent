@@ -262,6 +262,10 @@ Requirements:
 - risks: array of 1-3 concise strings
 - focus on cloud cost optimization, utilization, and governance
 - do not invent data not present in the input
+- do not add any system state, billing fact, resource dependency, or operational event unless it is explicitly present in the input
+- if a fact is not explicitly present in the input, do not imply it is true
+- if you make a cautious inference, label it clearly as an inference or a possibility to verify
+- never present assumptions as confirmed facts
 - avoid vague statements like "review the resource" without saying what to inspect
 - `estimated_monthly_cost` is only a reference cost for the VM when running, not proof of current spend after termination
 - if the VM is TERMINATED, do not say it is definitely still incurring the full VM run cost

@@ -1,6 +1,6 @@
 # FinOps AI Agent
 
-GCP infrastructure analytics pipeline for telemetry collection, rule-based analysis, historical enrichment, BigQuery storage, AI-assisted reporting, and data quality checks.
+GCP infrastructure analytics and RAG-based AI workflow for telemetry collection, rule-based analysis, historical enrichment, BigQuery storage, retrieval-backed knowledge grounding, AI-assisted reporting, and data quality checks.
 
 ## Overview
 
@@ -9,6 +9,7 @@ This project analyzes Google Compute Engine VM telemetry and combines:
 - SRE-oriented infrastructure visibility
 - FinOps-oriented optimization findings
 - data-engineering style collection, storage, and validation
+- AI-assisted reporting built on a retrieval-backed knowledge pipeline
 
 Each run can:
 
@@ -18,6 +19,8 @@ Each run can:
 - enrich current records with 7-day history from BigQuery
 - provision and re-provision the project VM with Terraform
 - translate selected findings into Terraform machine-type change proposals
+- ingest selected official GCP documentation into a local RAG knowledge layer
+- transform cleaned docs into cards, chunks, and a FAISS-backed retrieval index
 - write local JSON and Markdown artifacts
 - append telemetry and recommendations to BigQuery
 - generate a report with Gemini or deterministic fallback
@@ -40,6 +43,16 @@ When BigQuery history is available, the collector adds:
 - `seven_day_avg_cpu`
 - `seven_day_low_utilization_days`
 - `idle_but_expensive_flag`
+
+### Retrieval and RAG Foundation
+
+The project includes a local knowledge pipeline that can:
+
+- download and clean selected official GCP reference pages
+- convert cleaned article text into structured `json cards`
+- split cards into retrieval-oriented `chunks`
+- build a FAISS-based retrieval baseline over those chunks
+- run retrieval evals against project-relevant queries
 
 ### Recommendation Domains and Categories
 
@@ -82,17 +95,6 @@ Each recommendation now includes decision-oriented fields:
 - `recommended_owner`
   - suggested owner derived from labels and rule domain
 
-Priority meaning used in findings and emails:
-
-- `p1`
-  - highest priority; immediate review recommended
-- `p2`
-  - elevated priority; important SRE-style review item
-- `p3`
-  - normal follow-up priority; optimization or governance work item
-- `p4`
-  - low priority; informational or non-urgent follow-up
-
 ## Architecture
 
 1. `collector.py` loads configuration and queries GCP APIs plus Cloud Monitoring.
@@ -103,6 +105,7 @@ Priority meaning used in findings and emails:
 6. `summarizer.py` generates JSON and Markdown reports.
 7. `quality_check.py` validates run completeness and basic trustworthiness.
 8. `terraform_actions.py` turns eligible findings into Terraform patch proposals.
+9. `docs/knowledge/` provides the retrieval and grounding layer used by the project's RAG workflow.
 
 ## Project Structure
 
@@ -114,6 +117,20 @@ FinOps-AI-Agent/
 ├── quality_check.py
 ├── terraform_actions.py
 ├── requirements.txt
+├── docs/
+│   └── knowledge/
+│       ├── raw/
+│       ├── article/
+│       ├── cards/
+│       ├── chunks/
+│       ├── index/
+│       ├── eval/
+│       ├── clean_docs.py
+│       ├── build_cards.py
+│       ├── build_chunks.py
+│       ├── build_faiss_index.py
+│       ├── query_faiss.py
+│       └── eval_retrieval.py
 ├── terraform/
 │   ├── main.tf
 │   ├── outputs.tf
@@ -243,6 +260,17 @@ Run the full pipeline in this order:
 ./venv/bin/python terraform_actions.py
 ```
 
+For the local RAG knowledge pipeline:
+
+```bash
+python3 docs/knowledge/clean_docs.py
+python3 docs/knowledge/build_cards.py
+python3 docs/knowledge/build_chunks.py
+python3 docs/knowledge/build_faiss_index.py
+python3 docs/knowledge/query_faiss.py "how to create a dataset with terraform" --auto-filter
+python3 docs/knowledge/eval_retrieval.py
+```
+
 ### `collector.py`
 
 - loads environment variables
@@ -300,6 +328,38 @@ This step checks for:
 - skips proposals when conflicting SRE findings make downsizing unsafe
 - generates a proposal payload instead of editing Terraform automatically
 - writes `outputs/terraform_actions.json`
+
+### `docs/knowledge/clean_docs.py`
+
+- cleans downloaded raw HTML into task-focused article text
+- keeps the local knowledge source pipeline separate from the main runtime path
+
+### `docs/knowledge/build_cards.py`
+
+- converts cleaned articles into structured `json cards`
+- preserves document metadata such as topic, section, usage, and source
+- applies custom method-level splitting for selected docs such as labels and BigQuery dataset creation
+
+### `docs/knowledge/build_chunks.py`
+
+- turns cards into retrieval-oriented chunks
+- keeps metadata needed for retrieval, indexing, and grounding
+
+### `docs/knowledge/build_faiss_index.py`
+
+- builds the local FAISS index used by the project's retrieval layer
+- currently uses a lightweight TF-IDF vectorizer plus FAISS as the first retrieval implementation
+
+### `docs/knowledge/query_faiss.py`
+
+- queries the local FAISS retrieval layer
+- supports metadata pre-filtering by `topic`, `usage`, and `doc_id`
+- supports a lightweight `--auto-filter` mode for project-style queries
+
+### `docs/knowledge/eval_retrieval.py`
+
+- runs fixed retrieval eval cases against the current index
+- reports top-k pass rate plus more realistic `top-1`, `top-3`, and `top-5` hit rates
 
 ## Terraform
 
@@ -371,6 +431,74 @@ The current implementation focuses on right-sizing proposals:
 - it proposes a `machine_type` update in `terraform.tfvars` instead of applying changes directly
 - it also writes a patch-style preview for review before any Terraform apply step
 
+## Knowledge and RAG
+
+This project uses a local documentation-derived knowledge layer as the grounding base for its RAG workflow. Official GCP documentation is downloaded, cleaned, structured, chunked, indexed, and evaluated locally before being used for retrieval-backed prompting.
+
+### Knowledge Sources
+
+The repository includes a small set of downloaded official reference pages under `docs/knowledge/raw/` as the source corpus for the local RAG pipeline.
+
+Current source links:
+
+- Cloud Monitoring metrics catalog (`metrics_gcp_c`)
+  - `https://cloud.google.com/monitoring/api/metrics_gcp_c`
+- Ops Agent overview
+  - `https://cloud.google.com/stackdriver/docs/solutions/agents/ops-agent`
+- Ops Agent installation
+  - `https://cloud.google.com/stackdriver/docs/solutions/agents/ops-agent/installation`
+- Compute Engine labels
+  - `https://cloud.google.com/compute/docs/labeling-resources`
+- Compute Engine machine families and machine types
+  - `https://cloud.google.com/compute/docs/machine-resource`
+- Compute Engine machine types
+  - `https://cloud.google.com/compute/docs/machine-types`
+- BigQuery datasets
+  - `https://cloud.google.com/bigquery/docs/datasets`
+
+Current locally processed article sources:
+
+- `compute-labels`
+- `compute-machine-types`
+- `compute-machine-types-overview`
+- `ops-agent-installation`
+- `ops-agent-overview`
+- `bigquery-datasets`
+- `gcp-metrics-catalog`
+
+<!-- Excluded from automatic cleaning for now:
+
+- Terraform Google provider `google_compute_instance`
+  - `https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/compute_instance`
+- Terraform Google provider `google_bigquery_dataset`
+  - `https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/bigquery_dataset`
+
+The Terraform Registry pages are JS-driven and currently don't produce usable article text via the same HTML-to-text pipeline. -->
+
+Local knowledge directories:
+
+- `docs/knowledge/raw/`
+  - downloaded raw HTML sources
+- `docs/knowledge/article/`
+  - cleaned article text for downstream processing
+- `docs/knowledge/clean_docs.py`
+  - helper script for HTML-to-text cleaning
+
+These files make up the project's retrieval and grounding layer.
+
+### Current Retrieval Stack
+
+The current local retrieval stack is:
+
+- cleaned article text
+- `json cards`
+- `json chunks`
+- TF-IDF vectors
+- FAISS index
+- retrieval eval cases
+
+This gives the project a working offline RAG retrieval stack before upgrading to stronger semantic embeddings.
+
 ## Outputs
 
 Each run produces these local artifacts:
@@ -401,6 +529,18 @@ Each run produces these local artifacts:
   Terraform action proposal payload for right-sizing candidates managed by Terraform
 - `outputs/terraform_actions.patch`
   Patch-style preview of the suggested `terraform.tfvars` machine type change
+
+The knowledge pipeline also produces local retrieval artifacts under `docs/knowledge/`:
+
+- `docs/knowledge/cards/knowledge_cards.json`
+- `docs/knowledge/cards/knowledge_cards.jsonl`
+- `docs/knowledge/chunks/knowledge_chunks.json`
+- `docs/knowledge/chunks/knowledge_chunks.jsonl`
+- `docs/knowledge/index/knowledge.faiss`
+- `docs/knowledge/index/metadata.json`
+- `docs/knowledge/index/vectorizer.json`
+- `docs/knowledge/eval/retrieval_eval.json`
+- `docs/knowledge/eval/retrieval_eval.md`
 
 `collector.py` also prints a terminal snapshot table with:
 
@@ -458,6 +598,17 @@ Current expected result:
 - `Ran 18 tests`
 - `OK`
 
+Retrieval evaluation is currently tracked separately from unit tests:
+
+```bash
+python3 docs/knowledge/eval_retrieval.py
+```
+
+Current retrieval reports:
+
+- a top-k pass rate over fixed project queries
+- `top-1`, `top-3`, and `top-5` hit rates for topic/doc/usage matching
+
 ## Example Questions This Project Can Answer
 
 - Which instances stayed under 10% CPU across recent days?
@@ -473,3 +624,6 @@ Current expected result:
 - Google Cloud Monitoring API
 - Google BigQuery
 - Google Gemini API
+- Terraform
+- FAISS
+- local retrieval-backed RAG pipeline with TF-IDF + FAISS as the current index implementation

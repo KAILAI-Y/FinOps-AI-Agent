@@ -1,0 +1,1515 @@
+# Machine families resource and comparison guide  |  Compute Engine  |  Google Cloud Documentation
+
+Source file: compute-machine-types-overview.html
+
+This document describes the machine families, machine series, and machine types
+
+that you can choose from to create a virtual machine (VM) instance or bare metal
+
+instance with the resources that you need. When you create a compute instance,
+
+you select a machine type from a machine family that determines the resources
+
+available to that instance.
+
+There are several machine families you can choose from. Each machine family is
+
+further organized into machine series and predefined machine types within each
+
+series. For example, within the N2 machine series in the general-purpose
+
+machine family, you can select the
+
+n2-standard-4 machine type.
+
+For information about machine series that support
+
+Spot VMs (and preemptible VMs), see
+
+Compute Engine instances provisioning models .
+
+Note: This is a list
+
+of Compute Engine machine families. For a detailed explanation
+
+of each machine family, see the following pages:
+
+General-purpose —best price-performance ratio for a variety of
+
+workloads.
+
+Storage-optimized —best for workloads that are low in core usage and
+
+high in storage density.
+
+Compute-optimized —designed for high performance computing (HPC)
+
+solutions and compute-intensive workloads; offers high performance per core
+
+on Compute Engine.
+
+Memory-optimized —ideal for memory-intensive workloads, offering
+
+more memory per core than other machine families, with up to 12 TB of
+
+memory.
+
+Accelerator-optimized —ideal for massively parallelized Compute
+
+Unified Device Architecture (CUDA) compute workloads, such as machine
+
+learning (ML) and high performance computing (HPC). This family is the best
+
+option for workloads that require GPUs.
+
+Compute Engine terminology
+
+This documentation uses the following terms:
+
+Machine family : A curated set of processor and hardware configurations
+
+optimized for specific workloads, for example, General-purpose,
+
+Accelerator-optimized, or Memory-optimized.
+
+Machine series : Machine families are further classified by series,
+
+generation, and processor type.
+
+Each series focuses on a different aspect of computing power or
+
+performance. For example, the E series offers efficient VMs at a low cost,
+
+while the C series offer better performance.
+
+The generation is denoted by an ascending number. For example, the N1 series
+
+within the general-purpose machine family is the older version of the N2
+
+series.
+
+A higher generation or series number usually indicates newer underlying
+
+CPU platforms or technologies. For example, the M3 series, which runs on
+
+Intel Xeon Scalable Processor 3rd Generation (Ice Lake), is a newer
+
+generation than the M2 series, which runs on Intel Xeon Scalable Processor
+
+2nd Generation (Cascade Lake).
+
+AMD
+
+4th generation machine series
+
+N4, C4, X4, M4, A4
+
+C4D, G4, N4D, H4D
+
+N4A, C4A, A4X Max, A4X
+
+3rd generation machine series
+
+C3, H3, Z3, M3, A3
+
+2nd generation machine series
+
+N2, E2, C2, M2, A2, G2
+
+N2D, C2D, T2D, E2
+
+Machine type : Every machine series offers at least one machine type. Each
+
+machine type provides a set of resources for your compute instance, such as
+
+vCPUs, memory, disks, and GPUs.
+
+If a predefined machine type does not meet
+
+your needs, you can also create a custom machine type for
+
+some machine series.
+
+The following sections describe the different machine types.
+
+Predefined machine types
+
+Predefined machine types come with a non-configurable amount of memory and
+
+vCPUs. Predefined machine types use a variety of vCPU to memory ratios:
+
+highcpu — from 1 to 3 GB memory per vCPU; typically,
+
+2 GB memory per vCPU.
+
+standard — from 3 to 7 GB memory per vCPU; typically,
+
+4 GB memory per vCPU.
+
+highmem — from 7 to 12 GB memory per vCPU; typically,
+
+8 GB memory per vCPU.
+
+megamem — from 12 to 15 GB memory per vCPU; typically,
+
+14 GB memory per vCPU.
+
+ultramem — from 24 to 31 GB memory per vCPU.
+
+hypermem — from 15 to 24 GB memory per vCPU; typically,
+
+16 GB memory per vCPU.
+
+For example, a
+
+c3-standard-22 machine type has 22 vCPUs, and as a
+
+standard machine type, it also has 88 GB of memory.
+
+Local SSD machine types
+
+Local SSD machine types are special predefined machine types. The machine type
+
+names include
+
+lssd . When you create a compute instance using one of the
+
+following machine types,
+
+Titanium SSD or Local SSD disks
+
+are automatically attached to the instance:
+
+-lssd : Available with the C4, C4A, C4D, C3, C3D, and H4D
+
+machine series, these machine types attach a predetermined number of
+
+375 GiB Titanium SSD or Local
+
+SSD disks to the instance. Examples of this machine type include
+
+c4a-standard-4-lssd ,
+
+c3-standard-88-lssd , and
+
+c3d-highmem-360-lssd .
+
+-standardlssd : Available with the storage-optimized Z3 machine series, these
+
+machine types provide up to 350 GiB of Titanium SSD disk capacity per
+
+vCPU. These machine types are recommended for high performance search and data
+
+analysis for medium sized data sets. An example of this machine type is
+
+z3-highmem-22-standardlssd .
+
+-highlssd : Available with the Z3 machine series, these machine types provide
+
+between of 350 GiB and 600 GiB of Titanium SSD disk capacity
+
+per vCPU. These machine types offer high performance and are recommended for
+
+storage intensive streaming and data analysis for large sized data sets. An
+
+example of this machine type is
+
+z3-highmem-88-highlssd .
+
+Other machine series also support Local SSD disks but don't use a machine type
+
+name that includes
+
+lssd . For a list of all the machine types that you
+
+can use with Titanium SSD or Local SSD disks, see
+
+Choose a valid number of Local SSD disks .
+
+Bare metal machine types
+
+Bare metal machine types are a special predefined machine type. The machine type
+
+name includes
+
+-metal . When you create a compute instance using one of these
+
+machine types, there is no hypervisor installed on the instance. You can attach
+
+disks to a bare metal instance, just as you would with a VM
+
+instance. Bare metal instances can be used in VPC networks and subnetworks in
+
+the same way as VM instances.
+
+Note: Compute Engine bare metal instances aren't related to
+
+Bare Metal Solution .
+
+Bare metal instances on Compute Engine .
+
+Custom machine types
+
+If none of the predefined machine types match your workload needs, you can
+
+create a VM instance with a custom machine type for the
+
+N and E machine series
+
+in the general-purpose machine family.
+
+Custom machine types cost slightly more to use compared to an equivalent
+
+predefined machine type. Also, there are limitations in the amount of memory and
+
+vCPUs that you can select for a custom machine type. The on-demand prices for
+
+custom machine types include a 5% premium over the on-demand and commitment
+
+prices for predefined machine types.
+
+When creating a custom machine type, you can use the extended memory feature.
+
+Instead of using the default memory size based on the number of vCPUs you
+
+select, you can specify an amount of memory, up to the limit for the machine
+
+series.
+
+Create a VM with a custom machine type .
+
+Shared-core machine types
+
+The E2 and N1 series contain shared-core machine types.
+
+These machine types timeshare a physical core which can be a
+
+cost-effective method for running small, non-resource intensive apps.
+
+E2 : offers
+
+e2-micro ,
+
+e2-small , and
+
+e2-medium shared-core machine types with
+
+2 vCPUs for short periods of bursting.
+
+N1 : offers
+
+f1-micro and
+
+g1-small shared-core machine types
+
+which have up to 1 vCPU available for short periods of bursting.
+
+Machine family and series recommendations
+
+The following tables provide recommendations for different workloads.
+
+General-purpose workloads
+
+N4, N4A, N4D, N2, N2D, N1
+
+C4, C4A,
+
+C4D, C3, C3D
+
+Tau T2D, Tau T2A
+
+Balanced price/performance across a wide range of machine types
+
+Consistently high performance for a variety of workloads
+
+Day-to-day computing at a lower cost
+
+Best per-core performance/cost for scale-out workloads
+
+Medium traffic web and app servers
+
+Containerized microservices
+
+Business intelligence apps
+
+Virtual desktops
+
+CRM applications
+
+Development and test environments
+
+Batch processing
+
+Storage and archive
+
+High traffic web and app servers
+
+In-memory caches
+
+Ad servers
+
+Data analytics
+
+Media streaming and transcoding
+
+CPU-based ML training and inference
+
+Low-traffic web servers
+
+Back office apps
+
+Containerized microservices
+
+Virtual desktops
+
+Development and test environments
+
+Scale-out workloads
+
+Web serving
+
+Containerized microservices
+
+Media transcoding
+
+Large-scale Java applications
+
+Optimized workloads
+
+Storage-optimized
+
+Compute-optimized
+
+Memory-optimized
+
+Accelerator-optimized
+
+H4D, H3, C2 and C2D
+
+X4, M4, M3, M2, M1
+
+A4X Max, A4X, A4, A3, A2, G4, G2
+
+Highest block storage to compute ratios for storage-intensive
+
+workloads
+
+Highest performance and lower cost for high performance computing
+
+(HPC), multi-node and compute-bound workloads
+
+Highest memory to compute ratios for memory-intensive workloads
+
+Optimized for accelerated high performance computing workloads
+
+SQL, NoSQL, and vector databases
+
+Data analytics and data warehouses
+
+Media streaming
+
+Large distributed parallel file systems
+
+Manufacturing, weather forecasting, electronic design automation
+
+(EDA), High-performance web servers
+
+Healthcare and life sciences, scientific computing
+
+Seismic processing and structural mechanics applications
+
+Modeling and simulation workloads, AI/ML
+
+High-performance web servers, Game Servers
+
+Small to extra-large SAP HANA in-memory databases
+
+In-memory data stores, such as Redis
+
+High Performance databases such as Microsoft SQL Server, MySQL
+
+Electronic design automation
+
+Generative AI models such as the following:
+
+Large Language Models (LLM)
+
+Generative Adversarial Networks (GAN)
+
+CUDA-enabled ML training and inference
+
+High-performance computing (HPC)
+
+Massively parallelized computation
+
+BERT natural language processing
+
+Deep learning recommendation model (DLRM)
+
+Video transcoding
+
+Remote visualization workstation
+
+After you create a compute instance, you can use rightsizing recommendations
+
+to optimize resource utilization based on your workload. For more information,
+
+see Applying machine type recommendations for VMs .
+
+General-purpose machine family guide
+
+The general-purpose machine family
+
+offers several machine series with the best price-performance ratio for a
+
+variety of workloads.
+
+Compute Engine offers general-purpose machine series that run on
+
+either x86 or Arm architecture.
+
+x86
+
+The C4 machine series is available on the Intel Granite Rapids and Emerald
+
+Rapids CPU platforms and powered by
+
+Titanium . C4 machine types are optimized to deliver
+
+consistently high performance and scale up to 288 vCPUs, 2.2 TB of
+
+DDR5 memory, and 18 TiB of Local SSD. C4 is available in
+
+highcpu
+
+(2 GB memory per vCPU),
+
+standard (3.75 GB memory per vCPU), and
+
+highmem (7.75 GB memory per vCPU) configurations. C4 instances are
+
+aligned with the underlying
+
+non-uniform memory access (NUMA)
+
+architecture to offer optimal, reliable, and consistent performance.
+
+The C4D machine series is available on the AMD EPYC Turin CPU platform and
+
+powered by Titanium . C4D has a greater max boost frequency as
+
+compared with C3D, with improved Instructions Per Clock (IPC) for faster
+
+database transactions. By leveraging Hyperdisk storage and
+
+Titanium networking, C4D demonstrates up to 55% higher queries per
+
+second on Cloud SQL for MySQL and 35% better performance on
+
+Memorystore for Redis workloads as compared to C3D. C4D instances are
+
+available with up to 384 vCPUs, 3 TB of DDR5 memory, and 12 TiB of
+
+Local SSD.
+
+C4D is available in
+
+highcpu (1.875 GB memory per vCPU),
+
+standard
+
+(3.875 GB memory per vCPU), and
+
+highmem (7.875 GB memory per
+
+vCPU) configurations. C4D instances are aligned with the underlying
+
+NUMA architecture to offer optimal, reliable, and consistent performance.
+
+The N4 machine series is
+
+available on the Intel Emerald Rapids CPU platform and powered by
+
+Titanium . N4 machine types are
+
+optimized for flexibility and cost with both predefined and custom shapes
+
+and can scale up to 80 vCPUs at 640 GB of DDR5 memory. N4 is available
+
+highcpu (2 GB per vCPU),
+
+standard (4 GB per vCPU), and
+
+highmem (8 GB per vCPU) configurations.
+
+The N4D machine series is available on the AMD EPYC Turin CPU platform and
+
+powered by Titanium. N4D machine types are built for flexibility
+
+and cost optimization through an efficient architecture, and next generation
+
+dynamic resource management ,
+
+making better use of resources on host machines. You can create N4D VMs
+
+using predefined machine types with up to 96 vCPUs and 768 GB of
+
+DDR5 memory, or you can create N4D VMs using custom machine types that
+
+allow you to choose varied combinations of compute and
+
+memory to optimize costs and reduce resource waste.
+
+N4D is available in
+
+highcpu (2 GB per vCPU),
+
+standard
+
+(4 GB per vCPU), and
+
+highmem (8 GB per vCPU) configurations.
+
+The N2 machine series has up to 128 vCPUs, 8 GB of memory per vCPU, and
+
+is available on the Intel Ice Lake and Intel Cascade Lake CPU platforms.
+
+The N2D machine series has up to 224 vCPUs, 8 GB of memory per vCPU,
+
+and is available on the third generation AMD EPYC Milan platform.
+
+The C3 machine series offers up to 176 vCPUs and 2, 4, or 8 GB of
+
+memory per vCPU on the Intel Sapphire Rapids CPU platform and
+
+Titanium . C3 instances are aligned
+
+with the underlying NUMA architecture to offer optimal, reliable, and
+
+consistent performance.
+
+The C3D machine series offers up to 360 vCPUs and 2, 4, or 8 GB of
+
+memory per vCPU on the AMD EPYC Genoa CPU platform and
+
+Titanium . C3D instances are aligned
+
+with the underlying NUMA architecture to offer optimal, reliable, and
+
+consistent performance.
+
+The E2 machine series has up to 32 virtual cores (vCPUs) with up to
+
+128 GB of memory with a maximum of 8 GB per vCPU, and the lowest
+
+cost of all machine series. The E2 machine series has a predefined CPU
+
+platform, running either an Intel processor or an AMD processor. The
+
+processor is selected for you when you create the instance. This machine
+
+series provides a variety of compute resources for the lowest price on
+
+Compute Engine, especially when paired with
+
+committed use discounts .
+
+The Tau T2D machine series provides an optimized feature set for scaling out.
+
+Each VM instance can have up to 60 vCPUs, 4 GB of memory per vCPU,
+
+and is available on third generation AMD EPYC Milan processors. The Tau T2D
+
+machine series doesn't use cluster-threading, so a vCPU is
+
+equivalent to an entire core.
+
+The N1 machine series VMs can have up to 96 vCPUs, up to 6.5 GB of
+
+memory per vCPU, and are available on Intel Sandy Bridge, Ivy Bridge,
+
+Haswell, Broadwell, and Skylake CPU platforms.
+
+The N4A machine series is powered by Google's custom-designed Axion
+
+processor. The Axion process is built on Arm Neoverse N3 compute core, which
+
+supports Arm V9.2 architecture. The N4A machine series uses
+
+Titanium for CPU offloading. N4A instances provide
+
+up to 64 vCPUs with up to 8 GB of memory per vCPU
+
+with Uniform Memory Access (UMA) domain .
+
+N4A instances don't use simultaneous multithreading (SMT). A vCPU in a
+
+N4A instance is equivalent to an entire physical core.
+
+The N4A machine series is engineered to be our most efficient and flexible
+
+Arm-based series, delivering exceptional price-performance for a wide range
+
+of general-purpose and scale-out workloads. Ideal use cases include web
+
+and application servers, microservices, containerized applications using
+
+Google Kubernetes Engine (GKE), open-source databases, and development and testing
+
+environments.
+
+The C4A machine series is powered by Google Axion, and built on Arm Neoverse
+
+V2 compute core, which
+
+supports Arm V9 architecture. C4A instances are powered by
+
+Titanium IPU with disk and network offloads, this
+
+improves instance performance by reducing on-host processing.
+
+C4A instances provide up to 72 vCPUs with up to 8 GB of memory per vCPU
+
+in a single UMA domain.
+
+C4A offers
+
+-lssd machine types that come with up to 6 TiB of
+
+Titanium SSD capacity.
+
+C4A bare metal instances (Preview) have
+
+96 vCPUs and 768 GB of memory.
+
+C4A instances don't use simultaneous multithreading (SMT). A vCPU in a
+
+C4A instance is equivalent to an entire physical core.
+
+The Tau T2A machine series is the first machine series in Google Cloud
+
+built on Arm Neoverse N1 core compute. Tau T2A machines are optimized to
+
+deliver compelling price for performance. Each VM can have up to 48 vCPUs
+
+with 4 GB of memory per vCPU. The Tau T2A machine series runs on a
+
+64 core Ampere Altra processor with an Arm instruction set and an all-core
+
+frequency of 3 GHz. Tau T2A machine types support a single NUMA
+
+node and a vCPU is equivalent to an entire core.
+
+Storage-optimized machine family guide
+
+The storage-optimized machine family
+
+is best suited for high-performance and flash-optimized workloads such as SQL,
+
+NoSQL, and vector databases, scale-out data analytics, data warehouses and
+
+search, and distributed file systems that need fast access to large amounts of
+
+data stored in local storage. The storage-optimized machine family is designed
+
+to provide high local storage throughput and IOPS at sub-millisecond latency.
+
+standardlssd instances can have up to 176 vCPUs,
+
+1,408 GB of memory, and 36 TiB of Titanium SSD.
+
+highlssd instances can have up to 88 vCPUs, 704 GB of memory,
+
+and 36 TiB of Titanium SSD.
+
+Z3 bare metal instances have 192 vCPUs,
+
+1,536 GB of memory, and 72 TiB of local Titanium SSD.
+
+Z3 runs on the Intel Xeon Scalable processor (code name Sapphire Rapids) with
+
+DDR5 memory and
+
+offload processors. Z3 brings together compute, networking, and
+
+storage innovations into one platform. Z3 instances are aligned with the
+
+underlying NUMA architecture to offer optimal, reliable, and consistent
+
+performance.
+
+Compute-optimized machine family guide
+
+The compute-optimized machine family
+
+is optimized for running high performance computing (HPC), multi-node, and
+
+compute-bound applications by providing high performance per core.
+
+H4D instances offer 192 vCPUs and 720 GB of DDR5 memory. H4D instances
+
+run on the AMD EPYC Turin CPU platform, with
+
+Titanium offload and
+
+Cloud RDMA support. H4D
+
+instances are aligned with the underlying NUMA
+
+architecture to offer optimal, reliable, and consistent performance. H4D
+
+delivers improved scalability for multi-node workloads and HPC workloads.
+
+Cloud RDMA is a networking infrastructure component that lets you
+
+build a true cloud HPC platform that can run scientific computations and
+
+ML/AI workloads. Cloud RDMA delivers price
+
+performance ratios comparable to on-premise infrastructure.
+
+H3 instances offer 88 vCPUs and 352 GB of DDR5 memory. H3 instances run
+
+on the Intel Sapphire Rapids CPU platform and Titanium offload
+
+processors. H3 instances are aligned with the underlying NUMA architecture
+
+to offer optimal, reliable, and consistent performance. H3 delivers
+
+performance improvements for a wide variety of HPC workloads such as
+
+molecular dynamics, computational geoscience, financial risk analysis,
+
+weather modeling, frontend and backend EDA, and computational fluid
+
+dynamics.
+
+C2 instances offer up to 60 vCPUs, 4 GB of memory per vCPU, and are
+
+available on the Intel Cascade Lake CPU platform. C2 instances are aligned
+
+with the underlying NUMA architecture to offer optimal, reliable, and
+
+consistent performance.
+
+C2D instances offer up to 112 vCPUs, up to 8 GB of memory per vCPU, and
+
+are available on the third generation AMD EPYC Milan platform. C2D instances
+
+are aligned with the underlying NUMA architecture to offer optimal,
+
+reliable, and consistent performance.
+
+Memory-optimized machine family guide
+
+The memory-optimized machine family
+
+has machine series that are ideal for OLAP and OLTP SAP workloads, genomic
+
+modeling, electronic design automation, and memory intensive HPC
+
+workloads. This family offers more memory per core than
+
+any other machine family, with up to
+
+32 TB
+
+of memory.
+
+X4 bare metal instances offer up to 1,920 vCPUs, with either 12.8 or
+
+17 GB of memory per vCPU. X4 has machine types with 6, 8, 12, 16, 24,
+
+and 32 TB of memory, and is available on the Intel Sapphire Rapids
+
+CPU platform.
+
+M4 instances offer up to 224 vCPUs, with up to 26.5 GB of memory per
+
+vCPU, and are available on the Intel Emerald Rapids CPU platform.
+
+M3 instances offer up to 128 vCPUs, with up to 30.5 GB of memory per
+
+vCPU, and are available on the Intel Ice Lake CPU platform.
+
+M2 instances are available as 6 TB, 9 TB, and 12 TB machine
+
+types, and are available on the Intel Cascade Lake CPU platform.
+
+M1 instances offer up to 160 vCPUs, 14.9 GB to 24 GB of memory per
+
+vCPU, and are available on the Intel Skylake and Broadwell CPU platforms.
+
+Accelerator-optimized machine family guide
+
+The accelerator-optimized machine
+
+family is ideal for massively
+
+parallelized Compute Unified Device Architecture (CUDA) compute
+
+workloads , such as machine learning
+
+(ML) and high performance computing (HPC). This machine family is the optimal
+
+choice for workloads that require GPUs.
+
+Google also offers AI Hypercomputer for creating clusters of
+
+accelerator-optimized VMs with inter-GPU communication, which are designed for
+
+running very intensive AI and ML workloads. For more information, see
+
+AI Hypercomputer overview .
+
+A4X Max bare metal instances offer up to 144 vCPUs and up to 960 GB of
+
+memory. Each A4X Max machine type has 4 NVIDIA B300 GPUs attached to 2
+
+NVIDIA Grace CPUs. A4X Max bare metal instances have a maximum
+
+network bandwidth of up to 3,600 Gbps.
+
+A4X instances offer up to 140 vCPUs and up to 884 GB of memory. Each
+
+A4X machine type has 4 NVIDIA B200 GPUs attached to 2 NVIDIA Grace CPUs.
+
+A4X instances have a maximum network bandwidth of up to 2,000 Gbps.
+
+Important: The
+
+Compute Engine Service Level Agreement (SLA)
+
+doesn't apply to the A4X Max and A4X machine types.
+
+x86
+
+A4 instances offer up to 224 vCPUs and up to 3,968 GB of memory.
+
+Each A4 machine type has 8 NVIDIA B200 GPUs attached. A4 instances have a
+
+maximum network bandwidth of up to 3,600 Gbps and are available on
+
+the Intel Emerald Rapids CPU platform.
+
+A3 instances offer up to 224 vCPUs and up to 2,952 GB of memory.
+
+Each A3 machine type has either 1, 2, 4, or 8 NVIDIA H100 or 8 H200
+
+GPUs attached. A3 instances have a maximum network bandwidth of up to
+
+3,200 Gbps and are available on the following CPU platforms:
+
+Intel Emerald Rapids - A3 Ultra
+
+Intel Sapphire Rapids - A3 Mega, High, and Edge
+
+A3 instances are available with the A3 Edge machine type
+
+a3-edgegpu-8g-nolssd ), which offers 208 vCPUs, 1,872 GB of memory,
+
+and 8 NVIDIA H100 GPUs, on the Intel Sapphire Rapids CPU platform and
+
+Titanium .
+
+A2 instances offer 12 to 96 vCPUs, and up to 1,360 GB of memory.
+
+Each A2 machine type has either 1, 2, 4, 8, or 16 NVIDIA A100 GPUs
+
+attached. A2 instances have a maximum network bandwidth of up to
+
+100 Gbps and are available on the Intel Cascade Lake CPU platform.
+
+G4 instances offer 48 to 384
+
+vCPUs and up to 1,440 GB of memory. Each G4 instance has either
+
+1, 2, 4, or 8 NVIDIA RTX PRO 6000 GPUs attached. G4 instances have a
+
+maximum network bandwidth of up to 400 Gbps and are available on the
+
+AMD EPYC Turin CPU platform.
+
+G2 instances offer 4 to 96 vCPUs and up to 432 GB of memory. Each G2
+
+machine type has either 1, 2, 4, or 8 NVIDIA L4 GPUs attached. G2 instances
+
+have a maximum network bandwidth of up to 100 Gbps and are available
+
+on the Intel Cascade Lake CPU platform.
+
+Machine series comparison
+
+Use the following table to compare each machine family and determine
+
+which one is appropriate for your workload. If, after reviewing this section,
+
+you are still unsure which family is best for your workload, start with the
+
+general-purpose machine family. For details about all supported
+
+processors, see CPU platforms .
+
+To learn how your selection affects the performance of disk volumes
+
+attached to your compute instances, see:
+
+Persistent Disk: Disk performance by machine type and vCPU count
+
+Google Cloud Hyperdisk: Hyperdisk performance limits
+
+Compare the characteristics of different machine series, from C4 to G2.
+
+You can select specific properties in the Choose instance properties to
+
+compare field to compare those properties across all machine series in
+
+the following table.
+
+Workload type
+
+Instance type
+
+CPU type
+
+vCPUs
+
+vCPU definition
+
+Shared memory architecture
+
+Custom machine types
+
+Extended memory
+
+Sole tenancy
+
+Nested virtualization
+
+Confidential Computing
+
+Disk interface type
+
+Hyperdisk Balanced HA
+
+Hyperdisk ML
+
+Local SSD
+
+Max Local SSD
+
+Standard PD
+
+Balanced PD
+
+SSD PD
+
+Extreme PD
+
+Network interfaces
+
+Network performance
+
+Tier_1 networking
+
+Max GPUs
+
+Sustained use discounts
+
+Resource-based committed use discounts (CUDs)
+
+Compute flexible CUDs
+
+Spot VM discounts
+
+Clear all
+
+N1+GPU
+
+A3 (H200)
+
+A3 (H100)
+
+Workload type
+
+General-purpose
+
+Cost optimized
+
+Storage optimized
+
+Compute optimized
+
+Memory optimized
+
+Accelerator optimized
+
+Instance type
+
+VM and bare metal
+
+Bare metal
+
+CPU type
+
+Intel Emerald Rapids and Granite Rapids
+
+AMD EPYC Turin
+
+AMD EPYC Genoa
+
+AMD EPYC Turin
+
+Intel Cascade Lake and Ice Lake
+
+AMD EPYC Rome and EPYC Milan
+
+Intel Skylake, Broadwell, Haswell, Sandy Bridge, and Ivy Bridge
+
+AMD EPYC Milan
+
+Intel Skylake, Broadwell, and Haswell, AMD EPYC Rome and EPYC Milan
+
+AMD EPYC Turin
+
+AMD EPYC Milan
+
+Intel Skylake and Broadwell
+
+Intel Skylake, Broadwell, Haswell, Sandy Bridge, and Ivy Bridge
+
+NVIDIA Grace
+
+AMD EPYC Turin
+
+x86
+
+vCPUs
+
+2 to 288
+
+1 to 96
+
+2 to 384
+
+4 to 176
+
+4 to 360
+
+2 to 80
+
+1 to 64
+
+2 to 96
+
+2 to 128
+
+2 to 224
+
+1 to 96
+
+1 to 60
+
+1 to 48
+
+0.25 to 32
+
+8 to 192
+
+192
+
+4 to 60
+
+2 to 112
+
+480 to 1,920
+
+16 to 224
+
+32 to 128
+
+208 to 416
+
+40 to 160
+
+1 to 96
+
+144
+
+140
+
+224
+
+208
+
+12 to 96
+
+48 to 384
+
+4 to 96
+
+vCPU definition
+
+2 to 2,232 GB
+
+1 to 768 GB
+
+3 to 3,072 GB
+
+8 to 1,408 GB
+
+8 to 2,880 GB
+
+2 to 640 GB
+
+2 to 512 GB
+
+2 to 768 GB
+
+2 to 864 GB
+
+2 to 896 GB
+
+1.8 to 624 GB
+
+4 to 240 GB
+
+4 to 192 GB
+
+1 to 128 GB
+
+64 to 1,536 GB
+
+720 to 1,488 GB
+
+352 GB
+
+16 to 240 GB
+
+4 to 896 GB
+
+6,144 to 32,768 GB
+
+248 to 5,952 GB
+
+976 to 3,904 GB
+
+5,888 to 11,776 GB
+
+961 to 3,844 GB
+
+3.75 to 624 GB
+
+960 GB
+
+884 GB
+
+3,968 GB
+
+2,952 GB
+
+1,872 GB
+
+85 to 1,360 GB
+
+180 to 1,440 GB
+
+16 to 432 GB
+
+Shared memory architecture
+
+NUMA
+
+UMA
+
+NUMA
+
+UMA
+
+NUMA
+
+Custom machine types
+
+Extended memory
+
+Sole tenancy
+
+Nested virtualization
+
+Confidential Computing
+
+AMD SEV
+
+Intel TDX
+
+AMD SEV
+
+AMD SEV ,
+
+AMD SEV-SNP
+
+AMD SEV
+
+Intel TDX ,
+
+NVIDIA Confidential Computing
+
+Disk interface type
+
+NVMe
+
+SCSI (PD and Local SSD)
+
+NVMe (Local SSD)
+
+SCSI (PD and Local SSD)
+
+NVMe (Local SSD)
+
+SCSI (PD and Local SSD)
+
+NVMe (Local SSD)
+
+SCSI (PD and Local SSD)
+
+NVMe (Local SSD)
+
+NVMe
+
+SCSI
+
+NVMe
+
+SCSI (PD and Local SSD)
+
+NVMe (Local SSD)
+
+SCSI (PD and Local SSD)
+
+NVMe (Local SSD)
+
+NVMe
+
+SCSI
+
+SCSI (PD and Local SSD)
+
+NVMe (Local SSD)
+
+SCSI (PD and Local SSD)
+
+NVMe (Local SSD)
+
+NVMe
+
+SCSI (PD and Local SSD)
+
+NVMe (Local SSD)
+
+NVMe
+
+Hyperdisk Balanced HA
+
+Hyperdisk ML
+
+Local SSD
+
+Max Local SSD
+
+18 TiB
+
+6 TiB
+
+12 TiB
+
+9 TiB
+
+36 TiB (VM), 72 TiB (Metal)
+
+3 TiB
+
+9 TiB
+
+12 TiB
+
+6 TiB
+
+3 TiB
+
+12 TiB
+
+3 TiB
+
+Standard PD
+
+Zonal and Regional
+
+Balanced PD
+
+Zonal and Regional
+
+SSD PD
+
+Zonal and Regional
+
+Extreme PD
+
+Network interfaces
+
+gVNIC and IDPF
+
+gVNIC
+
+gVNIC and VirtIO-Net
+
+gVNIC
+
+gVNIC and VirtIO-Net
+
+gVNIC and IDPF
+
+gVNIC, IRDMA
+
+gVNIC
+
+gVNIC and VirtIO-Net
+
+IDPF
+
+gVNIC
+
+gVNIC and VirtIO-Net
+
+IDPF and MRDMA
+
+gVNIC and MRDMA
+
+gVNIC
+
+gVNIC and VirtIO-Net
+
+gVNIC
+
+gVNIC and VirtIO-Net
+
+Network performance
+
+10 to 100 Gbps
+
+10 to 50 Gbps
+
+10 to 100 Gbps
+
+23 to 100 Gbps
+
+20 to 100 Gbps
+
+10 to 50 Gbps
+
+Up to 50 Gbps
+
+10 to 50 Gbps
+
+10 to 32 Gbps
+
+2 to 32 Gbps
+
+10 to 32 Gbps
+
+1 to 16 Gbps
+
+23 to 100 Gbps
+
+up to 200 Gbps
+
+10 to 32 Gbps
+
+up to 100 Gbps
+
+16 to 100 Gbps
+
+up to 32 Gbps
+
+2 to 32 Gbps
+
+up to 3,600 Gbps
+
+up to 2,000 Gbps
+
+up to 3,600 Gbps
+
+up to 3,200 Gbps
+
+up to 1,800 Gbps
+
+24 to 100 Gbps
+
+50 to 400 Gbps
+
+10 to 100 Gbps
+
+Tier_1 networking
+
+50 to 200 Gbps
+
+50 to 100 Gbps
+
+50 to 200 Gbps
+
+50 to 100 Gbps
+
+50 to 200 Gbps
+
+50 to 100 Gbps
+
+Max GPUs
+
+Sustained use discounts
+
+Resource-based committed use discounts (CUDs)
+
+discounts
+
+Only at GA discounts
+
+discounts
+
+Compute flexible CUDs
+
+discounts
+
+Only at GA and for the new CUD model discounts
+
+Only for the new CUD model discounts
+
+discounts
+
+Only for the new CUD model discounts
+
+discounts
+
+Spot VM discounts
+
+GPUs and compute instances
+
+GPUs are used to accelerate workloads, and are supported for A4X Max, A4X, A4,
+
+A3, A2, G4, G2, and N1 instances. For instances that use A4X Max, A4X, A4, A3,
+
+A2, G4, or G2 machine types, the GPUs are automatically attached when you create
+
+the instance. For instances that use N1 machine types, you can attach GPUs to the
+
+instance during or after instance creation. GPUs can't be used with any other
+
+machine series.
+
+Accelerator-optimized instances have a fixed number of GPUs, vCPUs and memory
+
+per machine type, with the exception of G2 machines that offer a custom memory
+
+range. N1 instances with fewer GPUs attached are limited to a maximum number of
+
+vCPUs. In general, a higher number of GPUs lets you create instances with a
+
+higher number of vCPUs and memory.

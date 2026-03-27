@@ -321,6 +321,10 @@ Requirements:
 - include owner hints when available
 - keep the tone direct and operational, not marketing-style
 - do not invent facts not present in the input
+- do not add any system state, owner, root cause, dependency, or business impact unless it is explicitly present in the input
+- do not imply a recommendation was generated if it was not present in the input
+- if something is uncertain, frame it as a review item or a possibility to verify
+- never present assumptions as confirmed facts
 - if there are no findings in a section, say so briefly instead of padding
 - for Findings by Domain, group items under sre, finops, and governance
 - do not output markdown fences or explanations outside the JSON object

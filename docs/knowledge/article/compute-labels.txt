@@ -1,0 +1,1075 @@
+# Organize resources using labels  |  Compute Engine  |  Google Cloud Documentation
+
+Source file: compute-labels.html
+
+What are labels?
+
+A label is a key-value pair that you can assign to Google Cloud instances.
+
+They help you organize these resources and manage your costs at scale, with the
+
+granularity you need. You can attach a label to each resource, then filter the
+
+resources based on their labels. Information about labels is forwarded to the billing system that
+
+lets you break down your billed charges by label. With built-in billing reports ,
+
+you can filter and group costs by resource labels.
+
+You can also use labels to
+
+query billing data exports .
+
+Requirements for labels
+
+The labels applied to a resource must meet the following
+
+requirements:
+
+Each resource can have up to 64 labels.
+
+Each label must be a key-value pair.
+
+Keys have a minimum length of 1 character and a maximum length of 63
+
+characters, and cannot be empty. Values can be empty, and have a maximum length
+
+of 63 characters.
+
+Keys and values can contain only lowercase letters, numeric characters,
+
+underscores, and dashes. All characters must use UTF-8 encoding, and
+
+international characters are allowed. Keys must start with a lowercase letter or
+
+international character.
+
+The key portion of a label must be unique within a single resource.
+
+However, you can use the same key with multiple resources.
+
+These limits apply to the key and value for each label, and to the
+
+individual Google Cloud resources that have labels. There
+
+is no limit on how many labels you can apply across all resources
+
+within a project.
+
+Common uses of labels
+
+Here are some common use cases for labels:
+
+Team or cost center labels : Add labels based on team or
+
+cost center to distinguish instances owned by different
+
+teams (for example,
+
+team:research and
+
+team:analytics ). You can use this
+
+type of label for cost accounting or budgeting.
+
+Component labels : For example,
+
+component:redis ,
+
+component:frontend ,
+
+component:ingest , and
+
+component:dashboard .
+
+Environment or stage labels : For example,
+
+environment:production and
+
+environment:test .
+
+State labels : For example,
+
+state:active ,
+
+state:readytodelete , and
+
+state:archive .
+
+Ownership labels : Used to identify the teams that are
+
+responsible for operations, for example:
+
+team:shopping-cart .
+
+Virtual machine labels : A label can be attached to
+
+a virtual machine. Virtual machine tags that you defined in the past appear
+
+as a label without a value.
+
+Note: Don't include sensitive information in labels, including
+
+personally identifiable information, such as an individual's name or title.
+
+Labels are not designed to handle sensitive information.
+
+We don't recommend creating large numbers of unique labels, such as
+
+for timestamps or individual values for every API call.
+
+The problem with this approach is that when the values change frequently or with
+
+keys that clutter the catalog, this makes it difficult to effectively filter and
+
+report on resources.
+
+Labels and tags
+
+Labels can be used as queryable annotations for resources, but can't be used
+
+to set conditions on policies. Tags provide a way to conditionally allow or
+
+deny policies based on whether a resource has a specific tag, by providing fine-grained
+
+control over policies. For more information, see the
+
+Tags overview .
+
+Use labels on Compute Engine
+
+You can apply labels to the following Compute Engine resources:
+
+Virtual machine (VM) instances
+
+Persistent disks
+
+Persistent disk snapshots
+
+You can also use labels on related Google Cloud components such as the
+
+following:
+
+Cloud Storage buckets
+
+Networking resources:
+
+Forwarding rules used with internal Application Load Balancers (other load balancer forwarding
+
+rules aren't supported)
+
+VPN tunnels
+
+Static external IP addresses
+
+For example, you can add the following labels as key-value pairs to your
+
+resources:
+
+"labels": {
+
+"vmrole": "webserver",
+
+"environment": "production",
+
+"location": "west",...
+
+Create resources with labels
+
+When creating a new resource, you can apply labels to the resource.
+
+Note: You can't add labels to forwarding rules, static external IP addresses,
+
+and VPN tunnels when creating these resources. You can only add labels to these
+
+networking resources when you're updating the resource. For instructions on
+
+adding labels during an update, see
+
+Add or update labels to existing resources
+
+in this document.
+
+Go to the resource page that you want to create.
+
+For VM instances, go to Create an instance .
+
+For disks, go to Create a disk .
+
+For snapshots, go to Create a snapshot .
+
+For images, go to Create an image .
+
+Under Labels , click add Add label .
+
+Continue with the creation process.
+
+gcloud
+
+To add a label, use the
+
+create sub-command with the
+
+--labels flag. You
+
+can add labels to the Compute Engine resources by using the
+
+following
+
+gcloud commands:
+
+For VM instances, use the
+
+gcloud compute instances create command .
+
+For snapshots, use the
+
+gcloud compute disks snapshot command .
+
+For images, use the
+
+gcloud compute images create command .
+
+For disks, use the
+
+gcloud compute disks create command .
+
+gcloud compute instances create ... \
+
+--labels webserver=backend,media=images
+
+REST
+
+In the API, during the
+
+POST request to add a new resource, add the
+
+labels property in the request body to apply labels to the new resource.
+
+For VM instances, use the
+
+instances.insert() method .
+
+For snapshots, use the
+
+disks.createSnapshot() method .
+
+For images, use the
+
+images.insert() method .
+
+For disks, use the
+
+disks.insert() method .
+
+For example, the following snippet makes a
+
+POST request to create a VM
+
+instance with the labels
+
+webserver:backend and
+
+media:images :
+
+POST https://compute.googleapis.com/compute/v1/projects/myproject/zones/us-central1-f/instances
+
+"name": "myVM",
+
+"machineType": "zones/us-central1-f/machineTypes/custom-2-15360-ext",
+
+...,
+
+"labels": {
+
+"webserver": "backend",
+
+"media": "images"
+
+Add or update labels to existing resources
+
+You can add labels or update existing labels on resources by using the
+
+To add or update labels for forwarding rules, use the gcloud CLI or
+
+the Compute Engine API.
+
+Go to the resource page for which you want to add labels.
+
+For VM instances, go to VM instances .
+
+For snapshots, go to Snapshots .
+
+For images, go to Images .
+
+For disks, go to Disks .
+
+For static external IP addresses, go to External IP addresses .
+
+For VPN tunnels, go to VPN .
+
+Select the checkboxes next to the resources you want to label.
+
+To expand the labels column, click Show info panel .
+
+In the panel, select Labels .
+
+To add labels, click add Add
+
+label and add the key-value pair.
+
+To update labels, select the existing labels and modify their values.
+
+Save your changes.
+
+gcloud
+
+To add or change a label, use the
+
+update sub-command with the
+
+--update-labels flag. You can update labels for the Compute Engine
+
+resources by using the following
+
+gcloud commands:
+
+For VM instances, use the
+
+gcloud compute instances update
+
+command .
+
+For snapshots, use the
+
+gcloud compute snapshots update
+
+command .
+
+For images, use the
+
+gcloud compute images update
+
+command .
+
+For disks, use the
+
+gcloud compute disks update
+
+command .
+
+For forwarding rules, use the
+
+gcloud compute forwarding-rules
+
+update command .
+
+For static external IP addresses, use the
+
+gcloud beta compute addresses update command .
+
+For VPN tunnels, use the
+
+gcloud beta compute vpn-tunnels update
+
+command .
+
+gcloud compute disks update example-disk \
+
+--update-labels backend=webserver,media=images
+
+If you provide a label key that already exists, the Google Cloud CLI updates
+
+the existing key with the new label value. If you provide a new key, the
+
+tool adds the new key to the list of labels.
+
+REST
+
+To add or update labels, make a
+
+POST request to the
+
+setLabels method of the resource with the latest fingerprint
+
+and a full list of labels to apply:
+
+For VM instances, use the
+
+instances.setLabels() method .
+
+For snapshots, use the
+
+snapshots.setLabels() method .
+
+For images, use the
+
+images.setLabels() method .
+
+For disks, use the
+
+disks.setLabels() method .
+
+For forwarding rules, use the
+
+forwardingRules.setLabels() method .
+
+For regional static external IP addresses, use the
+
+beta
+
+addresses.setLabels() method .
+
+For global static external IP addresses, use the
+
+beta
+
+globalAddresses.setLabels() method .
+
+For VPN tunnels, use the beta
+
+vpnTunnels.setLabels() method .
+
+Similar to metadata and tags, if the resource has existing labels you want
+
+to keep, you must include those labels in the request, along with any
+
+new labels that you want to add.
+
+For example, the following snippet makes a
+
+POST request to a VM instance
+
+to set labels
+
+environment:test and
+
+an-existing-tag:yes :
+
+POST https://compute.googleapis.com/compute/v1/projects/myproject/zones/us-central1-f/instances/example-instance/setLabels
+
+"labels": {
+
+"environment": "test",
+
+"an-existing-tag": "yes"
+
+"labelFingerprint": "42WmSpB8rSM="
+
+View labels
+
+You can view labels for resources by using the Google Cloud console, the
+
+gcloud CLI, or the Compute Engine API. To view labels for
+
+forwarding rules, use the gcloud CLI or the Compute Engine API.
+
+Go to the resource page.
+
+For VM instances, go to VM instances .
+
+For snapshots, go to Snapshots .
+
+For images, go to Images .
+
+For disks, go to Disks .
+
+For static external IP addresses, go to External IP addresses .
+
+For VPN tunnels, go to VPN .
+
+Click the resource to view its details.
+
+Locate Labels .
+
+gcloud
+
+To view labels, use the
+
+describe sub-command. You can view labels for the
+
+Compute Engine resources by using the
+
+following
+
+gcloud commands:
+
+For VM instances, use the
+
+gcloud compute instances describe
+
+command .
+
+For snapshots, use the
+
+gcloud compute snapshots describe
+
+command .
+
+For images, use the
+
+gcloud compute images describe
+
+command .
+
+For disks, use the
+
+gcloud compute disks describe
+
+command .
+
+For forwarding rules, use the
+
+gcloud compute forwarding-rules
+
+describe command .
+
+For static external IP addresses, use the
+
+gcloud beta compute addresses
+
+describe command .
+
+For VPN tunnels. use the
+
+gcloud beta compute vpn-gateways describe
+
+command .
+
+gcloud compute disks describe example-disk
+
+The output contains the labels:
+
+...
+
+id: '5047929990219134234'
+
+kind: compute#disk
+
+labelFingerprint: GHZ1Un209U=0
+
+labels:
+
+environment: dev
+
+department: finance
+
+...
+
+REST
+
+To retrieve labels, make a
+
+GET request to the following resource:
+
+For VM instances, use the
+
+instances.get() method .
+
+For snapshots, use the
+
+snapshots.get() method .
+
+For images, use the
+
+images.get() method .
+
+For disks, use the
+
+disks.get() method .
+
+For forwarding rules, use the
+
+forwardingRules.get() method .
+
+For regional static external IP addresses, use the
+
+beta
+
+addresses.get() method .
+
+For global static external IP addresses, use the
+
+beta
+
+globalAddresses.get() method .
+
+For VPN tunnels, use the beta
+
+vpnTunnels.get() method .
+
+For example, the following snippet makes a
+
+GET request to retrieve labels
+
+for a VM instance:
+
+GET https://compute.googleapis.com/compute/v1/projects/ PROJECT_ID /zones/ ZONE /instances/ VM_NAME
+
+Replace the following:
+
+PROJECT_ID : the project ID
+
+ZONE : the zone of the VM
+
+VM_NAME : the name of the VM
+
+Get a label fingerprint for API requests
+
+When updating or adding labels in the API, you need to provide the latest labels
+
+fingerprint with your request, to prevent any conflicts with other requests.
+
+A fingerprint is only required for API requests; the Google Cloud console and
+
+the Google Cloud CLI tool do not require a fingerprint.
+
+Note: You can get the label fingerprint only by making a query directly to the
+
+API.
+
+To get the latest
+
+labelsFingerprint , make a
+
+GET request to the following
+
+resources:
+
+For VM instances, use the
+
+instances.get() method .
+
+For snapshots, use the
+
+snapshots.get() method .
+
+For images, use the
+
+images.get() method .
+
+For disks, use the
+
+disks.get() method .
+
+For forwarding rules, use the
+
+forwardingRules.get() method .
+
+For regional static external IP addresses, use the
+
+beta
+
+addresses.get() method .
+
+For global static external IP addresses, use the
+
+beta
+
+globalAddresses.get() method .
+
+For VPN tunnels, use the beta
+
+vpnTunnels.get() method .
+
+For example, the following snippet gets a
+
+labelsFingerprint for a VM instance:
+
+GET https://compute.googleapis.com/compute/v1/projects/myproject/zones/us-central1-f/instances/example-instance
+
+The response contains the
+
+labelFingerprint property:
+
+200 OK
+
+"kind": "compute#instance",
+
+"id": "4392196237934605253",
+
+"creationTimestamp": "2015-09-15T14:05:16.475-07:00",
+
+"zone": "https://content.googleapis.com/compute/v1/projects/myproject/zones/us-central1-f",
+
+"status": "RUNNING",
+
+...
+
+"labels": {
+
+"environment": "test"
+
+"labelFingerprint": "p1ty_9HoBk0="
+
+Remove a label
+
+You can remove labels from resources by using the Google Cloud console, the
+
+gcloud CLI, or the Compute Engine API. To remove labels for
+
+forwarding rules, use the gcloud CLI or the Compute Engine API.
+
+Go to the resource page for which you want to remove labels.
+
+For VM instances, go to VM instances .
+
+For snapshots, go to Snapshots .
+
+For images, go to Images .
+
+For disks, go to Disks .
+
+For static external IP addresses, go to External IP addresses .
+
+For VPN tunnels, go to VPN .
+
+Select the checkboxes next to the resources for which you want to remove
+
+labels.
+
+To expand the labels column, click Show info panel .
+
+To delete a label, click delete
+
+Delete .
+
+Save your changes.
+
+gcloud
+
+To add or change a label, use the
+
+update sub-command with the
+
+--remove-labels flag. You can remove labels for the Compute Engine
+
+resources by using the following
+
+gcloud commands:
+
+For VM instances, use the
+
+gcloud compute instances update
+
+command .
+
+For snapshots, use the
+
+gcloud compute snapshots update
+
+command .
+
+For images, use the
+
+gcloud compute images update
+
+command .
+
+For disks, use the
+
+gcloud compute disks update
+
+command .
+
+For forwarding rules, use the
+
+gcloud compute forwarding-rules
+
+update command .
+
+For static external IP addresses, use the
+
+gcloud beta compute addresses update
+
+command .
+
+For VPN tunnels, use the
+
+gcloud beta compute vpn-tunnels update
+
+command .
+
+gcloud compute disks update example-disk \
+
+--remove-labels backend,media
+
+REST
+
+To remove labels, make a
+
+POST request to the
+
+setLabels method of the
+
+following resource with the latest fingerprint
+
+and a full list of labels to apply:
+
+For VM instances, use the
+
+instances.setLabels() method .
+
+For snapshots, use the
+
+snapshots.setLabels() method .
+
+For images, use the
+
+images.setLabels() method .
+
+For disks, use the
+
+disks.setLabels() method .
+
+For forwarding rules, use the
+
+forwardingRules.setLabels() method .
+
+For regional static external IP addresses, use the
+
+beta
+
+addresses.setLabels() method .
+
+For global static external IP addresses, use the
+
+beta
+
+globalAddresses.setLabels() method .
+
+For VPN tunnels, use the beta
+
+vpnTunnels.setLabels() method .
+
+Provide the current
+
+labelsFingerprint and an empty list of labels to
+
+remove all labels, or provide a list of labels you want to keep (omitting
+
+the labels you want to remove). For example, the following snippet removes
+
+all labels from the VM:
+
+POST https://compute.googleapis.com/compute/v1/projects/myproject/zones/us-central1-f/instances/example-instance/setLabels
+
+"labels": { },
+
+"labelFingerprint": "42WmSpB8rSM="
+
+Filter searches using labels
+
+You can search your resources and filter results by labels by using the
+
+To filter forwarding rules by labels, use the gcloud CLI or the
+
+Compute Engine API.
+
+Go to the resource page for which you want to get a filtered list of
+
+resources.
+
+For VM instances, go to VM instances .
+
+For snapshots, go to Snapshots .
+
+For images, go to Images .
+
+For disks, go to Disks .
+
+For static external IP addresses, go to External IP addresses .
+
+For VPN tunnels, go to VPN .
+
+If prompted, select your project and click Continue .
+
+In the search bar, enter your key, value, or key-value pair. Your
+
+results include any partial matches.
+
+For example, to show only resources with the label
+
+env:dev , you
+
+can enter any of the following:
+
+Enter the key:
+
+env
+
+Enter the value:
+
+dev
+
+Enter the key-value pair:
+
+env:dev
+
+gcloud
+
+To filter based on labels, use the
+
+list sub-command of the following
+
+resources with the
+
+--filter flag:
+
+For VM instances, use the
+
+gcloud compute instances list
+
+command .
+
+For snapshots, use the
+
+gcloud compute snapshots list
+
+command .
+
+For images, use the
+
+gcloud compute images list
+
+command .
+
+For disks, use the
+
+gcloud compute disks list
+
+command .
+
+For forwarding rules, use the
+
+gcloud compute forwarding-rules list
+
+command .
+
+For static external IP addresses, use the
+
+gcloud beta compute addresses list
+
+command .
+
+For VPN tunnels, use the
+
+gcloud beta compute vpn-tunnels list
+
+command .
+
+The value of
+
+--filter flag must be in the
+
+labels. KEY = VALUE format. For example,
+
+if you wanted to filter on a label with
+
+env as the key and
+
+dev as the
+
+value, you can run this command:
+
+gcloud compute instances list \
+
+--filter labels.env=dev
+
+For more information about the filter syntax in the gcloud CLI,
+
+see the
+
+gcloud topic filters documentation .
+
+REST
+
+To filter resources, make a
+
+GET request to the
+
+list method of the
+
+following resources and include the filter field:
+
+For VM instances, use the
+
+instances.list() method .
+
+For snapshots, use the
+
+snapshots.list() method .
+
+For images, use the
+
+images.list() method .
+
+For disks, use the
+
+disks.list() method .
+
+For forwarding rules, use the
+
+forwardingRules.list() method .
+
+For regional static external IP addresses, use the
+
+beta
+
+addresses.list() method .
+
+For global static external IP addresses, use the
+
+beta
+
+globalAddresses.list() method .
+
+For VPN tunnels, use the beta
+
+vpnTunnels.list() method .
+
+For example, to list all the VMs in the project
+
+myproject and zone
+
+us-central1-a with a label that has a key-value pair of
+
+env:dev , set the
+
+filter field to
+
+labels.env:dev in your
+
+list request. If you include the
+
+filter field as a query string parameter, use a URL-encoded parameter value,
+
+filter=labels.env%3Adev :
+
+GET https://compute.googleapis.com/compute/v1/projects/myproject/zones/us-central1-a/instances?filter=labels.env%3Adev
+
+For more information, read the
+
+filter documentation
+
+in the Compute Engine API reference.
+
+Relationship between VM labels and tags
+
+In the past, labels and tags were related. For example, if you added a
+
+webserver:test label to a VM, Compute Engine automatically
+
+added a
+
+webserver tag to the VM.
+
+Now, labels and tags are separate. If you create a label on a VM,
+
+Compute Engine does not create a tag for the VM. If you
+
+need to create a tag on a VM, you must create the tag manually.
+
+To learn more about tags and their uses, see
+
+Tags overview .
