@@ -129,6 +129,37 @@ DOC_CONFIG = {
             ],
         },
     },
+    "vm-instance-pricing": {
+        "topic": "vm-lifecycle-costs",
+        "source": "https://cloud.google.com/compute/vm-instance-pricing",
+        "usage": ["lifecycle", "orphaned-resources", "vm-pricing"],
+        "headings": [
+            "VM instance billing model",
+            "Lifecycle implication for terminated VMs",
+            "Operational interpretation",
+        ],
+    },
+    "disk-image-pricing": {
+        "topic": "disk-pricing",
+        "source": "https://cloud.google.com/compute/disks-image-pricing",
+        "usage": ["lifecycle", "orphaned-resources", "disk-costs"],
+        "headings": [
+            "Disk pricing basics",
+            "Persistent disk lifecycle implication",
+            "Operational interpretation",
+        ],
+    },
+    "external-ip-pricing": {
+        "topic": "external-ip-pricing",
+        "source": "https://cloud.google.com/vpc/pricing",
+        "usage": ["lifecycle", "orphaned-resources", "external-ip-costs"],
+        "headings": [
+            "External IPv4 pricing basics",
+            "In use or not in use",
+            "Lifecycle implication",
+            "Operational interpretation",
+        ],
+    },
 }
 
 MAX_CARD_CHARS = 1400

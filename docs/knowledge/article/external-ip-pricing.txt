@@ -1,0 +1,25 @@
+# External IP pricing lifecycle notes
+
+Source: https://cloud.google.com/vpc/pricing
+
+External IPv4 pricing basics
+
+Google Cloud charges for static and ephemeral external IPv4 addresses according to the external IP pricing table.
+
+If you reserve a static external IP address and do not assign it to a resource, Google Cloud charges a higher rate than for an address that is in use.
+
+In use or not in use
+
+Google Cloud considers a static external IP address as in use if it is associated with a VM instance whether the instance is running or stopped.
+
+For an ephemeral IP address, Google Cloud considers the address as in use only when the associated VM instance is running.
+
+When the instance is stopped or deleted, Google Cloud releases the ephemeral IP address and no longer considers it in use.
+
+Lifecycle implication
+
+A stopped or terminated VM can still be associated with a billable static external IP address.
+
+Operational interpretation
+
+When a terminated VM is under review, check whether it still has a reserved static external IP. If the IP is still reserved or still associated with the VM, that resource can continue to generate cost even though the VM is not running.

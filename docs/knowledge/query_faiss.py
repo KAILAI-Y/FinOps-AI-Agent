@@ -27,6 +27,8 @@ def infer_filters(query: str) -> dict:
         inferred["topics"] = ["bigquery-datasets"]
     elif any(term in q for term in ["ops agent", "telemetry", "memory metric", "memory telemetry"]):
         inferred["topics"] = ["ops-agent"]
+    elif any(term in q for term in ["terminated vm", "stopped vm", "stopped instance", "terminated instance", "static ip", "persistent disk", "lingering cost", "orphaned resource", "terminated"]):
+        inferred["topics"] = ["vm-lifecycle-costs", "disk-pricing", "external-ip-pricing"]
     elif any(term in q for term in ["machine type", "machine types", "rightsizing", "right sizing", "shared-core"]):
         inferred["topics"] = ["machine-types"]
     elif any(term in q for term in ["cpu utilization", "metric", "metrics catalog", "network bytes", "uptime metric"]):
@@ -37,6 +39,8 @@ def infer_filters(query: str) -> dict:
         usages.extend(["missing-observability", "memory-metrics", "agent-installation"])
     if any(term in q for term in ["terraform", "dataset", "bigquery export"]):
         usages.extend(["dataset-setup", "bigquery-export"])
+    if any(term in q for term in ["terminated vm", "stopped vm", "stopped instance", "terminated instance", "static ip", "persistent disk", "lingering cost", "orphaned resource", "terminated"]):
+        usages.extend(["lifecycle", "orphaned-resources", "disk-costs", "external-ip-costs", "vm-pricing"])
     if any(term in q for term in ["label", "owner", "cost center", "cost-center"]):
         usages.extend(["governance", "owner-labels", "cost-center-labels"])
     if any(term in q for term in ["rightsizing", "machine type", "machine types"]):

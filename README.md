@@ -21,9 +21,12 @@ Each run can:
 - translate selected findings into Terraform machine-type change proposals
 - ingest selected official GCP documentation into a local RAG knowledge layer
 - transform cleaned docs into cards, chunks, and a FAISS-backed retrieval index
+- ground report generation with retrieved evidence and map key conclusions back to source chunks
+- attach inline source footnotes to grounded report conclusions
 - write local JSON and Markdown artifacts
 - append telemetry and recommendations to BigQuery
 - generate a report with Gemini or deterministic fallback
+- generate an email preview with source references and a PDF report attachment
 - run basic data quality checks
 
 ## Features
@@ -52,7 +55,17 @@ The project includes a local knowledge pipeline that can:
 - convert cleaned article text into structured `json cards`
 - split cards into retrieval-oriented `chunks`
 - build a FAISS-based retrieval baseline over those chunks
+- build a semantic FAISS index over the same chunk set
 - run retrieval evals against project-relevant queries
+
+### Grounded Generation
+
+The reporting layer uses retrieval-grounded generation:
+
+- `summarizer.py` retrieves supporting evidence for supported finding categories before generation
+- the report records grounding status, retrieved evidence, evidence-to-conclusion mappings, and inline source footnotes
+- `emailer.py` reuses those grounded sources instead of generating explanations from scratch
+- the email workflow includes source references, conclusion-to-source mappings, and an attached PDF report
 
 ### Recommendation Domains and Categories
 
@@ -129,8 +142,11 @@ FinOps-AI-Agent/
 │       ├── build_cards.py
 │       ├── build_chunks.py
 │       ├── build_faiss_index.py
+│       ├── build_semantic_index.py
 │       ├── query_faiss.py
-│       └── eval_retrieval.py
+│       ├── query_semantic.py
+│       ├── eval_retrieval.py
+│       └── eval_retrieval_semantic.py
 ├── terraform/
 │   ├── main.tf
 │   ├── outputs.tf
@@ -267,8 +283,11 @@ python3 docs/knowledge/clean_docs.py
 python3 docs/knowledge/build_cards.py
 python3 docs/knowledge/build_chunks.py
 python3 docs/knowledge/build_faiss_index.py
+python3 docs/knowledge/build_semantic_index.py
 python3 docs/knowledge/query_faiss.py "how to create a dataset with terraform" --auto-filter
+python3 docs/knowledge/query_semantic.py "how to create a dataset with terraform" --auto-filter
 python3 docs/knowledge/eval_retrieval.py
+python3 docs/knowledge/eval_retrieval_semantic.py
 ```
 
 ### `collector.py`
@@ -286,6 +305,7 @@ python3 docs/knowledge/eval_retrieval.py
 
 - loads `metrics.json` and `recommendations.json`
 - builds report context
+- retrieves semantic grounding evidence for supported categories such as observability, governance, rightsizing, and lifecycle review
 - calls Gemini when available
 - falls back to deterministic summary when needed
 - writes JSON and Markdown report outputs
@@ -301,6 +321,8 @@ It also carries decision metadata for each finding, including:
 - action priority
 - recommended owner
 - human review requirement
+- evidence references for `why_it_matters`, `recommended_action`, and `decision_rule`
+- Markdown footnotes that point those grounded conclusions back to retrieved source entries
 
 ### `quality_check.py`
 
@@ -319,6 +341,9 @@ This step checks for:
 - uses Gemini to generate email subject, plain text, and HTML when available
 - falls back to a deterministic email template when Gemini is unavailable
 - writes local preview files
+- renders `outputs/finops_report.pdf` from the Markdown report
+- includes source references and conclusion-to-source mappings in the email body
+- attaches the PDF report when SMTP delivery is configured
 - sends the email through SMTP when SMTP configuration is present
 
 ### `terraform_actions.py`
@@ -348,7 +373,13 @@ This step checks for:
 ### `docs/knowledge/build_faiss_index.py`
 
 - builds the local FAISS index used by the project's retrieval layer
-- currently uses a lightweight TF-IDF vectorizer plus FAISS as the first retrieval implementation
+- uses a lightweight TF-IDF vectorizer plus FAISS as the lexical retrieval baseline
+
+### `docs/knowledge/build_semantic_index.py`
+
+- builds a semantic FAISS index from the same chunk set
+- uses a local transformer embedding model with mean pooling and normalized vectors
+- keeps the semantic retrieval path separate from the TF-IDF baseline so both can be compared
 
 ### `docs/knowledge/query_faiss.py`
 
@@ -356,10 +387,21 @@ This step checks for:
 - supports metadata pre-filtering by `topic`, `usage`, and `doc_id`
 - supports a lightweight `--auto-filter` mode for project-style queries
 
+### `docs/knowledge/query_semantic.py`
+
+- queries the semantic FAISS retrieval layer
+- reuses the same metadata pre-filtering interface as the lexical baseline
+- supports both direct querying and the batch retrieval path used by `summarizer.py` for grounded generation
+
 ### `docs/knowledge/eval_retrieval.py`
 
 - runs fixed retrieval eval cases against the current index
 - reports top-k pass rate plus more realistic `top-1`, `top-3`, and `top-5` hit rates
+
+### `docs/knowledge/eval_retrieval_semantic.py`
+
+- runs the same fixed eval set against the semantic index
+- makes baseline-versus-semantic comparison explicit at the retrieval layer
 
 ## Terraform
 
@@ -435,6 +477,25 @@ The current implementation focuses on right-sizing proposals:
 
 This project uses a local documentation-derived knowledge layer as the grounding base for its RAG workflow. Official GCP documentation is downloaded, cleaned, structured, chunked, indexed, and evaluated locally before being used for retrieval-backed prompting.
 
+Grounded generation is currently applied to report categories that have explicit retrieval mappings, including:
+
+- `missing-observability`
+- `governance`
+- `review-before-rightsizing`
+- `persistent-low-utilization`
+- `idle-but-expensive`
+- `high-cpu-sustained`
+- `high-network-throughput`
+- `high-disk-activity`
+- `lifecycle`
+
+In the grounded path:
+
+- `summarizer.py` retrieves semantic evidence before Gemini generation
+- the generated report records `grounding.mode`, `grounding.status`, retrieved evidence entries, and per-conclusion evidence IDs
+- `finops_report.md` adds inline source footnotes such as `[^1]` on `Why It Matters`, `Recommended Action`, and `Decision Rule`
+- `emailer.py` reuses the same grounded evidence and attaches a PDF version of the report
+
 ### Knowledge Sources
 
 The repository includes a small set of downloaded official reference pages under `docs/knowledge/raw/` as the source corpus for the local RAG pipeline.
@@ -455,6 +516,12 @@ Current source links:
   - `https://cloud.google.com/compute/docs/machine-types`
 - BigQuery datasets
   - `https://cloud.google.com/bigquery/docs/datasets`
+- VM instance pricing
+  - `https://cloud.google.com/compute/vm-instance-pricing`
+- Disk and image pricing
+  - `https://cloud.google.com/compute/disks-image-pricing`
+- VPC pricing
+  - `https://cloud.google.com/vpc/pricing`
 
 Current locally processed article sources:
 
@@ -465,6 +532,9 @@ Current locally processed article sources:
 - `ops-agent-overview`
 - `bigquery-datasets`
 - `gcp-metrics-catalog`
+- `vm-instance-pricing`
+- `disk-image-pricing`
+- `external-ip-pricing`
 
 <!-- Excluded from automatic cleaning for now:
 
@@ -493,11 +563,11 @@ The current local retrieval stack is:
 - cleaned article text
 - `json cards`
 - `json chunks`
-- TF-IDF vectors
-- FAISS index
-- retrieval eval cases
+- TF-IDF + FAISS lexical baseline
+- transformer embeddings + FAISS semantic index
+- retrieval eval cases for both tracks
 
-This gives the project a working offline RAG retrieval stack before upgrading to stronger semantic embeddings.
+This gives the project both a working offline lexical baseline and a stronger semantic retrieval path inside the same RAG workflow.
 
 ## Outputs
 
@@ -512,9 +582,11 @@ Each run produces these local artifacts:
 - `outputs/recommendations.json`
   Deterministic findings generated by the rule engine, including domain, action priority, human review flag, and recommended owner
 - `outputs/finops_report.json`
-  Structured report output
+  Structured report output, including grounding status, retrieved evidence, and conclusion-to-evidence mappings
 - `outputs/finops_report.md`
-  Markdown report with summary, actions, snapshot findings, and trend findings
+  Markdown report with summary, actions, snapshot findings, trend findings, grounding evidence, and source footnotes
+- `outputs/finops_report.pdf`
+  PDF rendering of the Markdown report for email attachment and easier reading
 - `outputs/quality_report.json`
   Structured data quality results
 - `outputs/quality_report.md`
@@ -522,9 +594,9 @@ Each run produces these local artifacts:
 - `outputs/email_preview.json`
   Structured email preview payload
 - `outputs/email_preview.txt`
-  Plain text email preview
+  Plain text email preview with source references and conclusion-to-source mappings
 - `outputs/email_preview.html`
-  HTML email preview
+  HTML email preview with clickable source links and conclusion-to-source mappings
 - `outputs/terraform_actions.json`
   Terraform action proposal payload for right-sizing candidates managed by Terraform
 - `outputs/terraform_actions.patch`
@@ -539,8 +611,13 @@ The knowledge pipeline also produces local retrieval artifacts under `docs/knowl
 - `docs/knowledge/index/knowledge.faiss`
 - `docs/knowledge/index/metadata.json`
 - `docs/knowledge/index/vectorizer.json`
+- `docs/knowledge/index/knowledge_semantic.faiss`
+- `docs/knowledge/index/semantic_metadata.json`
+- `docs/knowledge/index/semantic_index_config.json`
 - `docs/knowledge/eval/retrieval_eval.json`
 - `docs/knowledge/eval/retrieval_eval.md`
+- `docs/knowledge/eval/retrieval_eval_semantic.json`
+- `docs/knowledge/eval/retrieval_eval_semantic.md`
 
 `collector.py` also prints a terminal snapshot table with:
 
@@ -602,12 +679,14 @@ Retrieval evaluation is currently tracked separately from unit tests:
 
 ```bash
 python3 docs/knowledge/eval_retrieval.py
+python3 docs/knowledge/eval_retrieval_semantic.py
 ```
 
 Current retrieval reports:
 
 - a top-k pass rate over fixed project queries
 - `top-1`, `top-3`, and `top-5` hit rates for topic/doc/usage matching
+- side-by-side lexical baseline versus semantic retrieval results
 
 ## Example Questions This Project Can Answer
 
@@ -626,4 +705,4 @@ Current retrieval reports:
 - Google Gemini API
 - Terraform
 - FAISS
-- local retrieval-backed RAG pipeline with TF-IDF + FAISS as the current index implementation
+- local retrieval-backed RAG pipeline with both TF-IDF + FAISS baseline retrieval and transformer-based semantic FAISS retrieval

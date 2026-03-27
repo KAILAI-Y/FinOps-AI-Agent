@@ -1,5 +1,6 @@
 import json
 import os
+import subprocess
 from pathlib import Path
 
 import requests
@@ -13,6 +14,44 @@ REPORT_JSON_PATH = OUTPUTS_DIR / "finops_report.json"
 REPORT_MD_PATH = OUTPUTS_DIR / "finops_report.md"
 GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 TREND_CATEGORIES = {"persistent-low-utilization", "idle-but-expensive"}
+GROUNDING_QUERY_MAP = {
+    "missing-observability": {
+        "query": "why is memory telemetry missing on a vm",
+        "reason": "Explain missing memory telemetry and Ops Agent requirements.",
+    },
+    "governance": {
+        "query": "why should i use owner and cost center labels",
+        "reason": "Explain governance and chargeback value of labels.",
+    },
+    "review-before-rightsizing": {
+        "query": "how to compare compute engine machine types for rightsizing",
+        "reason": "Support cautious rightsizing guidance with machine type context.",
+    },
+    "persistent-low-utilization": {
+        "query": "how to compare compute engine machine types for rightsizing",
+        "reason": "Support trend-based rightsizing candidates with machine type context.",
+    },
+    "idle-but-expensive": {
+        "query": "how to compare compute engine machine types for rightsizing",
+        "reason": "Support cost-focused rightsizing review with machine type context.",
+    },
+    "high-cpu-sustained": {
+        "query": "what metric shows compute engine cpu utilization",
+        "reason": "Ground sustained CPU review in official metric definitions.",
+    },
+    "high-network-throughput": {
+        "query": "what metric shows compute engine cpu utilization",
+        "reason": "Ground throughput review in metric catalog context.",
+    },
+    "high-disk-activity": {
+        "query": "what metric shows compute engine cpu utilization",
+        "reason": "Ground disk activity review in metric catalog context.",
+    },
+    "lifecycle": {
+        "query": "what costs can remain after a compute engine vm is terminated",
+        "reason": "Explain separately billed resources such as disks and static external IPs after VM termination.",
+    },
+}
 
 
 def load_env_from_file(filename=".env"):
@@ -36,6 +75,181 @@ def load_env_from_file(filename=".env"):
 def load_json(path):
     with open(path, "r", encoding="utf-8") as file_obj:
         return json.load(file_obj)
+
+
+def build_grounding_queries(recommendations):
+    seen_queries = set()
+    grounding_queries = []
+    for recommendation in recommendations:
+        category = recommendation.get("category")
+        entry = GROUNDING_QUERY_MAP.get(category)
+        if not entry:
+            continue
+        if entry["query"] in seen_queries:
+            continue
+        seen_queries.add(entry["query"])
+        grounding_queries.append(
+            {
+                "category": category,
+                "query": entry["query"],
+                "reason": entry["reason"],
+            }
+        )
+    return grounding_queries
+
+
+def build_grounding_context(recommendations, top_k_per_query=2, max_evidence=6):
+    queries = build_grounding_queries(recommendations)
+    if not queries:
+        return {
+            "mode": "none",
+            "status": "no-matching-findings",
+            "queries": [],
+            "evidence": [],
+        }
+
+    evidence = []
+    seen_ids = set()
+    semantic_query_script = BASE_DIR / "docs" / "knowledge" / "query_semantic.py"
+    if not semantic_query_script.is_file():
+        return {
+            "mode": "none",
+            "status": "unavailable",
+            "error": "query_semantic.py not found",
+            "queries": queries,
+            "evidence": [],
+        }
+
+    try:
+        completed = subprocess.run(
+            [
+                "python3",
+                str(semantic_query_script),
+                "--batch-json",
+            ],
+            cwd=BASE_DIR,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=90,
+            input=json.dumps(
+                {
+                    "top_k": top_k_per_query,
+                    "queries": [
+                        {
+                            "query": query_item["query"],
+                            "auto_filter": True,
+                        }
+                        for query_item in queries
+                    ],
+                }
+            ),
+        )
+        payload = json.loads(completed.stdout)
+        batched_results = payload.get("queries", [])
+    except Exception as exc:
+        return {
+            "mode": "none",
+            "status": "query-failed",
+            "error": str(exc),
+            "queries": queries,
+            "evidence": evidence,
+        }
+
+    for query_item, result_payload in zip(queries, batched_results):
+        results = result_payload.get("results", [])
+        for row in results:
+            evidence_id = row["id"]
+            if evidence_id in seen_ids:
+                continue
+            seen_ids.add(evidence_id)
+            evidence.append(
+                {
+                    "id": row["id"],
+                    "category": query_item["category"],
+                    "query": query_item["query"],
+                    "reason": query_item["reason"],
+                    "title": row["title"],
+                    "topic": row["topic"],
+                    "doc_id": row["doc_id"],
+                    "source": row["source"],
+                    "usage": row["usage"],
+                    "score": row["score"],
+                    "content": row["content"],
+                }
+            )
+            if len(evidence) >= max_evidence:
+                break
+        if len(evidence) >= max_evidence:
+            break
+
+    return {
+        "mode": "semantic-faiss",
+        "status": "ok",
+        "queries": queries,
+        "evidence": evidence,
+    }
+
+
+def build_grounding_references(context):
+    grounding = context.get("grounding") or {}
+    evidence = grounding.get("evidence") or []
+    recommendations = context.get("recommendations") or []
+    if not evidence:
+        return {
+            "why_it_matters_evidence": [],
+            "recommended_action_evidence": [],
+            "decision_rule_evidence": [],
+        }
+
+    severity_rank = {"high": 0, "medium": 1, "low": 2}
+    prioritized = sorted(
+        recommendations,
+        key=lambda recommendation: (
+            severity_rank.get(recommendation.get("severity", "low"), 3),
+            recommendation.get("category", ""),
+        ),
+    )
+    primary_category = prioritized[0].get("category") if prioritized else None
+
+    def select_ids(categories):
+        if not categories:
+            return [item["id"] for item in evidence[:2]]
+        matched = [item["id"] for item in evidence if item.get("category") in categories]
+        return matched[:2] if matched else [item["id"] for item in evidence[:2]]
+
+    action_categories = [primary_category] if primary_category else []
+    if primary_category in {"review-before-rightsizing", "persistent-low-utilization", "idle-but-expensive"}:
+        action_categories = list(
+            {
+                primary_category,
+                "review-before-rightsizing",
+                "persistent-low-utilization",
+                "idle-but-expensive",
+            }
+        )
+
+    return {
+        "why_it_matters_evidence": select_ids([primary_category] if primary_category else []),
+        "recommended_action_evidence": select_ids(action_categories),
+        "decision_rule_evidence": select_ids(action_categories),
+    }
+
+
+def build_footnote_index(evidence):
+    footnote_map = {}
+    ordered = []
+    for item in evidence:
+        evidence_id = item.get("id")
+        if evidence_id and evidence_id not in footnote_map:
+            footnote_map[evidence_id] = len(ordered) + 1
+            ordered.append(item)
+    return footnote_map, ordered
+
+
+def format_footnote_refs(evidence_ids, footnote_map):
+    refs = [f"[^{footnote_map[evidence_id]}]" for evidence_id in evidence_ids if evidence_id in footnote_map]
+    return "".join(refs)
 
 
 def build_report_context(metrics, recommendations):
@@ -261,6 +475,8 @@ Requirements:
 - actions: array of 2-4 concise strings
 - risks: array of 1-3 concise strings
 - focus on cloud cost optimization, utilization, and governance
+- use the provided grounding evidence when explaining platform-specific behavior such as missing telemetry, labels, metrics, or machine-type guidance
+- if grounding evidence is present, prefer those snippets over generic cloud knowledge
 - do not invent data not present in the input
 - do not add any system state, billing fact, resource dependency, or operational event unless it is explicitly present in the input
 - if a fact is not explicitly present in the input, do not imply it is true
@@ -271,6 +487,7 @@ Requirements:
 - if the VM is TERMINATED, do not say it is definitely still incurring the full VM run cost
 - for disks, static IPs, or other leftover charges, present them as possibilities to verify, not confirmed facts unless explicitly present in the input
 - distinguish clearly between observed facts, rule-based findings, and your own cautious inference
+- do not cite any external document or recommendation that is not included in the input grounding evidence
 
 Input:
 {json.dumps(context, indent=2)}
@@ -346,6 +563,12 @@ def build_markdown_report(report):
     risks = report.get("risks") or []
     snapshot_findings = report.get("snapshot_findings") or []
     trend_findings = report.get("trend_findings") or []
+    grounding = report.get("grounding") or {}
+    evidence = grounding.get("evidence") or []
+    why_it_matters_evidence = report.get("why_it_matters_evidence") or []
+    recommended_action_evidence = report.get("recommended_action_evidence") or []
+    decision_rule_evidence = report.get("decision_rule_evidence") or []
+    footnote_map, ordered_evidence = build_footnote_index(evidence)
 
     lines = [
         "# FinOps Report",
@@ -360,10 +583,14 @@ def build_markdown_report(report):
         report.get("primary_candidate", "None"),
         "",
         "## Why It Matters",
-        report.get("why_it_matters", "No explanation available."),
+        report.get("why_it_matters", "No explanation available.") + format_footnote_refs(why_it_matters_evidence, footnote_map),
+    ]
+    lines.extend(
+        [
         "",
         "## How To Check",
-    ]
+        ]
+    )
     if how_to_check:
         lines.extend(f"- {item}" for item in how_to_check)
     else:
@@ -373,10 +600,18 @@ def build_markdown_report(report):
         [
             "",
             "## Recommended Action",
-            report.get("recommended_action", "No action suggested."),
+            report.get("recommended_action", "No action suggested.") + format_footnote_refs(recommended_action_evidence, footnote_map),
+        ]
+    )
+    lines.extend(
+        [
             "",
             "## Decision Rule",
-            report.get("decision_rule", "No decision rule available."),
+            report.get("decision_rule", "No decision rule available.") + format_footnote_refs(decision_rule_evidence, footnote_map),
+        ]
+    )
+    lines.extend(
+        [
             "",
             "## Additional Actions",
         ]
@@ -421,6 +656,25 @@ def build_markdown_report(report):
     else:
         lines.append("- No material risks identified.")
 
+    lines.append("")
+    lines.append("## Grounding Evidence")
+    if evidence:
+        for item in evidence:
+            lines.append(
+                f"- [{item['topic']}] {item['title']} | source: {item['source']} | score: {item['score']}"
+            )
+    else:
+        lines.append("- No retrieval grounding evidence attached to this run.")
+
+    if ordered_evidence:
+        lines.append("")
+        lines.append("## Source Footnotes")
+        for item in ordered_evidence:
+            number = footnote_map[item["id"]]
+            lines.append(
+                f"[^{number}]: {item['title']} [{item['topic']}] | {item['source']} | score: {item['score']}"
+            )
+
     return "\n".join(lines) + "\n"
 
 
@@ -438,6 +692,7 @@ def main():
     metrics = load_json(METRICS_PATH)
     recommendations = load_json(RECOMMENDATIONS_PATH)
     context = build_report_context(metrics, recommendations)
+    context["grounding"] = build_grounding_context(recommendations)
 
     report = None
     try:
@@ -452,6 +707,9 @@ def main():
     else:
         report["snapshot_findings"] = context["finding_breakdown"]["snapshot_findings"]
         report["trend_findings"] = context["finding_breakdown"]["trend_findings"]
+
+    report["grounding"] = context.get("grounding", {})
+    report.update(build_grounding_references(context))
 
     write_outputs(report)
     print(f"Report written: {REPORT_JSON_PATH.name}, {REPORT_MD_PATH.name} [{report['mode']}]")

@@ -1,0 +1,23 @@
+# Disk and image pricing lifecycle notes
+
+Source: https://cloud.google.com/compute/disks-image-pricing
+
+Disk pricing basics
+
+Each VM has at least one disk attached to it. Each disk incurs a cost.
+
+All disk-related charges are prorated by seconds.
+
+Provisioned disk space includes all used and unused space.
+
+If you provision a disk, you are billed for the entire provisioned disk space until you relinquish it.
+
+Persistent disk lifecycle implication
+
+Disk pricing is separate from VM instance pricing.
+
+A terminated VM can therefore still leave behind cost if its persistent disks or snapshots still exist.
+
+Operational interpretation
+
+When reviewing a terminated VM for lingering cost, check whether persistent disks, boot disks, or snapshots still exist and are still provisioned, because those resources continue to be billed until they are deleted.

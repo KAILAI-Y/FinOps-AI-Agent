@@ -1,0 +1,21 @@
+# VM instance pricing lifecycle notes
+
+Source: https://cloud.google.com/compute/vm-instance-pricing
+
+VM instance billing model
+
+VM instance pricing covers the cost of running a Compute Engine VM instance.
+
+The page explicitly says that VM instance pricing does not cover disk and image costs or networking costs. Those are billed separately.
+
+VM resources such as vCPUs and memory are billed with a 1 minute minimum and then in 1 second increments after the first minute.
+
+Lifecycle implication for terminated VMs
+
+If a VM is terminated or stopped, it is no longer accruing the full running compute charge for vCPU and memory.
+
+However, terminating a VM does not automatically prove that all associated resource charges have ended, because disks and some networking resources are billed on separate pricing pages.
+
+Operational interpretation
+
+When a report says a terminated VM may still have lingering cost, that conclusion should be interpreted as a follow-up check for separately billed resources rather than proof that the full VM run cost is still active.

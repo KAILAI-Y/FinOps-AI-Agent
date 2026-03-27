@@ -1,6 +1,7 @@
 import json
 import os
 import smtplib
+import subprocess
 from email.message import EmailMessage
 from pathlib import Path
 
@@ -12,6 +13,8 @@ from summarizer import extract_gemini_text, load_env_from_file, load_json
 BASE_DIR = Path(__file__).resolve().parent
 OUTPUTS_DIR = BASE_DIR / "outputs"
 REPORT_JSON_PATH = OUTPUTS_DIR / "finops_report.json"
+REPORT_MD_PATH = OUTPUTS_DIR / "finops_report.md"
+REPORT_PDF_PATH = OUTPUTS_DIR / "finops_report.pdf"
 QUALITY_JSON_PATH = OUTPUTS_DIR / "quality_report.json"
 TREND_JSON_PATH = OUTPUTS_DIR / "trend_analysis.json"
 RECOMMENDATIONS_JSON_PATH = OUTPUTS_DIR / "recommendations.json"
@@ -107,6 +110,34 @@ def build_email_context(report, quality_report, trend_analysis, recommendations)
         ),
         "none",
     )
+    grounding = report.get("grounding", {})
+    grounding_evidence = grounding.get("evidence", [])
+    source_references = []
+    source_lookup = {}
+    seen_source_ids = set()
+    for item in grounding_evidence:
+        source_id = item.get("id")
+        if source_id in seen_source_ids:
+            continue
+        seen_source_ids.add(source_id)
+        source_item = {
+            "id": source_id,
+            "title": item.get("title", "unknown"),
+            "source": item.get("source", ""),
+            "topic": item.get("topic", "unknown"),
+            "score": item.get("score"),
+        }
+        source_references.append(source_item)
+        source_lookup[source_id] = source_item
+
+    def resolve_source_list(ids):
+        return [source_lookup[source_id] for source_id in ids if source_id in source_lookup]
+
+    evidence_mapping = {
+        "why_it_matters": resolve_source_list(report.get("why_it_matters_evidence", [])),
+        "recommended_action": resolve_source_list(report.get("recommended_action_evidence", [])),
+        "decision_rule": resolve_source_list(report.get("decision_rule_evidence", [])),
+    }
     return {
         "headline": report.get("headline", "Infrastructure Review Summary"),
         "primary_candidate": report.get("primary_candidate", "None"),
@@ -121,6 +152,12 @@ def build_email_context(report, quality_report, trend_analysis, recommendations)
         "highest_priority": highest_priority,
         "quality_summary": quality_report.get("summary", {}),
         "trend_summary": summary,
+        "grounding": grounding,
+        "source_references": source_references,
+        "evidence_mapping": evidence_mapping,
+        "why_it_matters_evidence": report.get("why_it_matters_evidence", []),
+        "recommended_action_evidence": report.get("recommended_action_evidence", []),
+        "decision_rule_evidence": report.get("decision_rule_evidence", []),
     }
 
 
@@ -131,6 +168,8 @@ def build_fallback_email(context):
     trend_summary = context["trend_summary"]
     domain_counts = context.get("domain_counts", {})
     priority_counts = context.get("priority_counts", {})
+    source_references = context.get("source_references", [])
+    evidence_mapping = context.get("evidence_mapping", {})
     subject = build_fallback_subject(context)
     lines = [
         "Cloud Operations Notification",
@@ -205,6 +244,45 @@ def build_fallback_email(context):
             f"- Priority counts: p1={priority_counts.get('p1', 0)}, p2={priority_counts.get('p2', 0)}, p3={priority_counts.get('p3', 0)}, p4={priority_counts.get('p4', 0)}",
         ]
     )
+    lines.extend(
+        [
+            "",
+            "Reference Sources",
+        ]
+    )
+    if source_references:
+        for item in source_references:
+            score_suffix = f" | score={item['score']}" if item.get("score") is not None else ""
+            lines.append(
+                f"- {item.get('title', 'unknown')} [{item.get('topic', 'unknown')}] | {item.get('source', '')}{score_suffix}"
+            )
+    else:
+        lines.append("- No grounded source references were attached to this run.")
+
+    lines.extend(
+        [
+            "",
+            "Conclusion to Source Mapping",
+        ]
+    )
+    mapping_labels = [
+        ("Why It Matters", "why_it_matters"),
+        ("Recommended Action", "recommended_action"),
+        ("Decision Rule", "decision_rule"),
+    ]
+    has_mapping = False
+    for label, key in mapping_labels:
+        refs = evidence_mapping.get(key, [])
+        if refs:
+            has_mapping = True
+            lines.append(f"- {label}:")
+            for item in refs:
+                score_suffix = f" | score={item['score']}" if item.get("score") is not None else ""
+                lines.append(
+                    f"  {item.get('title', 'unknown')} | {item.get('source', '')}{score_suffix}"
+                )
+    if not has_mapping:
+        lines.append("- No conclusion-specific source mapping was attached to this run.")
 
     plain_text = "\n".join(lines) + "\n"
     html = build_html_email(subject, context)
@@ -229,6 +307,8 @@ def build_html_email(subject, context):
     quality_summary = context.get("quality_summary", {})
     trend_summary = context.get("trend_summary", {})
     domain_counts = context.get("domain_counts", {})
+    source_references = context.get("source_references", [])
+    evidence_mapping = context.get("evidence_mapping", {})
 
     action_items_html = "".join(
         "<li>"
@@ -258,6 +338,34 @@ def build_html_email(subject, context):
         {item.get("recommended_owner", "unknown") for item in action_items if item.get("recommended_owner")}
     )
     owner_html = "".join(f"<li>{owner}</li>" for owner in owner_hints) or "<li>No owner-specific routing was generated in this run.</li>"
+    source_html = "".join(
+        "<li>"
+        f"<a href=\"{item.get('source', '#')}\">{item.get('title', 'unknown')}</a> "
+        f"<small>[{item.get('topic', 'unknown')}]"
+        + (f" score={item.get('score')}" if item.get("score") is not None else "")
+        + "</small>"
+        "</li>"
+        for item in source_references
+    ) or "<li>No grounded source references were attached to this run.</li>"
+    mapping_sections = []
+    for label, key in (
+        ("Why It Matters", "why_it_matters"),
+        ("Recommended Action", "recommended_action"),
+        ("Decision Rule", "decision_rule"),
+    ):
+        refs = evidence_mapping.get(key, [])
+        if refs:
+            item_html = "".join(
+                "<li>"
+                f"<a href=\"{item.get('source', '#')}\">{item.get('title', 'unknown')}</a> "
+                f"<small>[{item.get('topic', 'unknown')}]"
+                + (f" score={item.get('score')}" if item.get("score") is not None else "")
+                + "</small>"
+                "</li>"
+                for item in refs
+            )
+            mapping_sections.append(f"<h3>{label}</h3><ul>{item_html}</ul>")
+    mapping_html = "".join(mapping_sections) or "<p>No conclusion-specific source mapping was attached to this run.</p>"
 
     return f"""
 <html>
@@ -291,6 +399,12 @@ def build_html_email(subject, context):
       <li>Persistent low-utilization instances: {trend_summary.get('persistent_low_utilization_instances', 0)}</li>
       <li>Idle-but-expensive instances: {trend_summary.get('idle_but_expensive_instances', 0)}</li>
     </ul>
+
+    <h2>Reference Sources</h2>
+    <ul>{source_html}</ul>
+
+    <h2>Conclusion to Source Mapping</h2>
+    {mapping_html}
   </body>
 </html>
 """.strip()
@@ -316,10 +430,14 @@ Requirements:
   4. Recommended Next Action
   5. Owner Hints
   6. Quality and Trend Summary
+  7. Reference Sources
+  8. Conclusion to Source Mapping
 - prioritize p1 and p2 findings first
 - mention domain names such as sre, finops, governance when relevant
 - include owner hints when available
 - keep the tone direct and operational, not marketing-style
+- use the provided grounding evidence when you explain platform-specific behavior or remediation steps
+- prefer grounded explanations over generic cloud advice
 - do not invent facts not present in the input
 - do not add any system state, owner, root cause, dependency, or business impact unless it is explicitly present in the input
 - do not imply a recommendation was generated if it was not present in the input
@@ -327,6 +445,9 @@ Requirements:
 - never present assumptions as confirmed facts
 - if there are no findings in a section, say so briefly instead of padding
 - for Findings by Domain, group items under sre, finops, and governance
+- for Reference Sources, list the grounded source title and a directly usable URL when grounding evidence is present
+- for Conclusion to Source Mapping, explicitly show which sources support Why It Matters, Recommended Action, and Decision Rule
+- do not cite any external document or practice unless it appears in the grounding evidence contained in the input
 - do not output markdown fences or explanations outside the JSON object
 
 The email is for an operator or reviewer who needs to understand what happened in this run and what to do next.
@@ -381,6 +502,87 @@ def write_email_outputs(payload):
         file_obj.write(payload["html"])
 
 
+def markdown_line_to_html(line: str) -> str:
+    text = line.strip()
+    if not text:
+        return ""
+    if text.startswith("### "):
+        return f"<b>{text[4:].strip()}</b>"
+    if text.startswith("## "):
+        return f"<b>{text[3:].strip()}</b>"
+    if text.startswith("# "):
+        return f"<b>{text[2:].strip()}</b>"
+    if text.startswith("- "):
+        return f"&bull; {text[2:].strip()}"
+    return text
+
+
+def render_report_pdf() -> Path:
+    OUTPUTS_DIR.mkdir(exist_ok=True)
+    script = r"""
+from pathlib import Path
+import sys
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import inch
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
+
+md_path = Path(sys.argv[1])
+pdf_path = Path(sys.argv[2])
+
+def markdown_line_to_html(line: str) -> str:
+    text = line.strip()
+    if not text:
+        return ""
+    if text.startswith("### "):
+        return f"<b>{text[4:].strip()}</b>"
+    if text.startswith("## "):
+        return f"<b>{text[3:].strip()}</b>"
+    if text.startswith("# "):
+        return f"<b>{text[2:].strip()}</b>"
+    if text.startswith("- "):
+        return f"&bull; {text[2:].strip()}"
+    return text
+
+markdown_text = md_path.read_text(encoding="utf-8")
+doc = SimpleDocTemplate(
+    str(pdf_path),
+    pagesize=letter,
+    leftMargin=0.75 * inch,
+    rightMargin=0.75 * inch,
+    topMargin=0.75 * inch,
+    bottomMargin=0.75 * inch,
+)
+styles = getSampleStyleSheet()
+body_style = ParagraphStyle(
+    "ReportBody",
+    parent=styles["BodyText"],
+    fontName="Helvetica",
+    fontSize=10,
+    leading=14,
+    spaceAfter=6,
+)
+story = []
+for raw_line in markdown_text.splitlines():
+    html_line = markdown_line_to_html(raw_line)
+    if not html_line:
+        story.append(Spacer(1, 0.12 * inch))
+        continue
+    story.append(Paragraph(html_line, body_style))
+doc.build(story)
+print(pdf_path)
+"""
+    subprocess.run(
+        ["python3", "-c", script, str(REPORT_MD_PATH), str(REPORT_PDF_PATH)],
+        cwd=BASE_DIR,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=60,
+    )
+    return REPORT_PDF_PATH
+
+
 def send_email(payload):
     smtp_host = os.getenv("SMTP_HOST")
     smtp_port = os.getenv("SMTP_PORT")
@@ -395,6 +597,14 @@ def send_email(payload):
     message["To"] = email_to
     message.set_content(payload["plain_text"])
     message.add_alternative(payload["html"], subtype="html")
+    if REPORT_MD_PATH.is_file():
+        pdf_path = render_report_pdf()
+        message.add_attachment(
+            pdf_path.read_bytes(),
+            maintype="application",
+            subtype="pdf",
+            filename=pdf_path.name,
+        )
 
     smtp_username = os.getenv("SMTP_USERNAME")
     smtp_password = os.getenv("SMTP_PASSWORD")
@@ -431,6 +641,11 @@ def main():
         payload = build_fallback_email(context)
 
     write_email_outputs(payload)
+    if REPORT_MD_PATH.is_file():
+        pdf_path = render_report_pdf()
+        payload["report_pdf_path"] = str(pdf_path)
+        with open(EMAIL_JSON_PATH, "w", encoding="utf-8") as file_obj:
+            json.dump(payload, file_obj, indent=4)
     sent, message = send_email(payload)
     print(
         f"Email preview written: {EMAIL_JSON_PATH.name}, {EMAIL_TXT_PATH.name}, {EMAIL_HTML_PATH.name} [{payload['mode']}]"
