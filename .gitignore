@@ -14,3 +14,8 @@ crash.log
 terraform.tfvars
 terraform/tfplan.binary
 terraform/.infracost/
+.venv/
+.coverage
+coverage.xml
+htmlcov/
+dist/

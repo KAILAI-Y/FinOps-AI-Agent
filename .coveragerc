@@ -1,0 +1,6 @@
+[run]
+branch = True
+source = finops_agent, summarizer, emailer, quality_check
+
+[report]
+show_missing = True

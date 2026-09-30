@@ -654,6 +654,49 @@ The `recommendations` table stores decision-oriented fields such as:
 - `needs_human_review`
 - `recommended_owner`
 
+## Continuous integration and delivery artifacts
+
+The GitHub Actions workflow in `.github/workflows/ci.yml` runs on pushes,
+pull requests, and manual dispatches. It checks Python 3.11 and 3.12,
+compiles the Python sources, runs the offline unit tests with branch coverage,
+and uploads a coverage XML report for each version. Coverage is reported rather
+than used as a minimum gate: cloud API and live model calls are not yet covered
+by the offline suite.
+
+A separate job checks Terraform formatting and runs `init -backend=false`
+with the committed provider lock file, followed by `validate`. These checks
+require no GCP credentials and do not create infrastructure. Validation does
+not replace a deployment-specific plan or integration test.
+
+Only after both test jobs and Terraform validation succeed does the workflow
+build and upload `finops-agent.zip` as a GitHub Actions artifact. Pushes of
+version tags are checked through the same pipeline. The bundle uses explicit
+source/data patterns; it excludes `.env`, credentials, Terraform state, and
+runtime outputs. This provides CI and validated delivery artifacts; it does
+not perform automatic production deployment or execute Terraform apply.
+
+Reproduce the Python checks locally:
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements-dev.txt
+.venv/bin/python -m compileall -q collector.py emailer.py summarizer.py quality_check.py terraform_actions.py finops_agent docs/knowledge scripts
+.venv/bin/python -m coverage run -m unittest discover -s tests -v
+.venv/bin/python -m coverage report
+.venv/bin/python scripts/build_bundle.py
+```
+
+With Terraform 1.9.8 installed:
+
+```bash
+terraform fmt -check -recursive terraform
+terraform -chdir=terraform init -backend=false -input=false -lockfile=readonly
+terraform -chdir=terraform validate -no-color
+```
+
+The workflow activates when these files are pushed to GitHub. Making passing
+checks required for merging additionally needs repository branch protection.
+
 ## Testing
 
 The repository includes offline unit tests for:
